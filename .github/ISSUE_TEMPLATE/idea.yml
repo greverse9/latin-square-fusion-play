@@ -1,0 +1,29 @@
+name: 제안·기타 의견
+description: 있었으면 하는 기능, 바꾸고 싶은 점, 그 밖의 이야기
+title: "[제안] "
+labels: ["feedback", "idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: 의견
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 왜 그렇게 생각하나요? (선택)
+  - type: input
+    id: version
+    attributes:
+      label: 버전
+  - type: input
+    id: device
+    attributes:
+      label: 기기
+  - type: textarea
+    id: playlog
+    attributes:
+      label: 플레이 요약 (선택)
+      description: 게임에서 '내 플레이 요약 첨부'를 켜면 채워져요. 공개적으로 게시됩니다.
+      render: text

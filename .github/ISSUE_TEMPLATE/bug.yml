@@ -1,0 +1,40 @@
+name: 버그 신고
+description: 화면이 이상하거나, 규칙대로 동작하지 않거나, 멈췄어요.
+title: "[버그] "
+labels: ["feedback", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: 게임 안 **메뉴 → 의견 보내기**로 열면 버전과 기기 정보가 자동으로 채워져요.
+  - type: textarea
+    id: what
+    attributes:
+      label: 무슨 일이 있었나요?
+      description: 기대한 것과 실제로 일어난 일. 스크린샷을 끌어다 놓아도 좋아요.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 다시 일어나게 하는 방법 (알면)
+      placeholder: |
+        1. 스테이지 3에서
+        2. ...
+  - type: input
+    id: context
+    attributes:
+      label: 어디에서
+  - type: input
+    id: version
+    attributes:
+      label: 버전
+  - type: input
+    id: device
+    attributes:
+      label: 기기
+  - type: textarea
+    id: playlog
+    attributes:
+      label: 플레이 요약 (선택)
+      description: 게임에서 '내 플레이 요약 첨부'를 켜면 채워져요. 공개적으로 게시됩니다.
+      render: text

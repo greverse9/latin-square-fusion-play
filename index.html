@@ -502,6 +502,10 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
 .goal-chip.big { font-size: calc(22px * var(--fs)); padding: 6px 16px 6px 10px; }
 .intro-limit { font-size: calc(26px * var(--fs)); color: var(--ink); }
 .small { font-size: calc(13px * var(--fs)); color: var(--ink-faint); }
+.btn.quiet { min-height: 40px; background: none; border-color: transparent; color: var(--ink-faint); font-weight: 500; }
+.check { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 4px; color: var(--ink); line-height: 1.45; }
+.check input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--k1-ink); flex-shrink: 0; }
+.check small { color: var(--ink-faint); }
 .rules { padding-left: 1.1em; margin: 8px 0; }
 .rules li { margin: 6px 0; color: var(--ink-soft); }
 .rules b { color: var(--ink); }
@@ -2257,7 +2261,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
   async function exportPlaylog() {
     const data = {
       app: 'sagak-sagak',
-      version: '0.1.0',
+      version: '0.2.0',
       exportedAt: new Date().toISOString(),
       device: { ua: navigator.userAgent, viewport: innerWidth + 'x' + innerHeight, dpr: window.devicePixelRatio || 1 },
       settings: app.settings,
@@ -2268,6 +2272,77 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
     };
     const ok = await copyText(JSON.stringify(data));
     toast(ok ? '테스트 기록 ' + app.playlog.length + '건을 복사했어요' : '복사하지 못했어요', 2400);
+  }
+
+  // --- player feedback: opens a prefilled GitHub issue form on the public play repo (docs/FEEDBACK.md) ---
+  const FEEDBACK_REPO = 'greverse9/latin-square-fusion-play';
+  const VERSION = '0.2.0'; // stamped by scripts/build.mjs
+  const versionLabel = () => (VERSION.indexOf('_') === 0 ? '개발판' : 'v' + VERSION);
+
+  function deviceInfo() {
+    const ua = navigator.userAgent;
+    const os = /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : 'etc';
+    const br = /SamsungBrowser/.test(ua) ? 'Samsung' : /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome/.test(ua) ? 'Chrome' : /FxiOS|Firefox/.test(ua) ? 'Firefox' : /Safari/.test(ua) ? 'Safari' : 'etc';
+    return os + ' · ' + br + ' · ' + innerWidth + '×' + innerHeight;
+  }
+
+  function gameContext() {
+    const g = app.game;
+    if (!g || g.mode === 'tutorial') return '튜토리얼';
+    if (g.mode === 'stage') return '스테이지 ' + g.stage + ' (' + g.moves + '/' + g.limit + '수)';
+    return (g.mode === 'daily' ? '오늘의 퍼즐 ' + g.dailyKey : '끝없는 도전') + ' ' + g.level + '단계 (' + g.moves + '수)';
+  }
+
+  /** Compact, anonymous summary of this device's play log (only attached if the player opts in). */
+  function playSummary() {
+    const stages = {};
+    app.playlog.filter((a) => a.mode === 'stage').forEach((a) => {
+      const s = stages[a.stage] || (stages[a.stage] = { tries: 0, won: 0, best: 0, minMoves: null, limit: a.limit, undos: 0, sec: 0 });
+      s.tries++; s.undos += a.undos || 0; s.sec += a.sec || 0;
+      if (a.result === 'won') {
+        s.won++;
+        s.best = Math.max(s.best, a.stars || 0);
+        s.minMoves = s.minMoves == null ? a.moves : Math.min(s.minMoves, a.moves);
+      }
+    });
+    const lines = Object.keys(stages).map(Number).sort((a, b) => a - b).map((n) => {
+      const s = stages[n];
+      return 'S' + n + ': ' + s.tries + '회 시도, ' + s.won + '회 클리어' +
+        (s.won ? ', 별 ' + s.best + ', 최소 ' + s.minMoves + '/' + s.limit + '수' : '') +
+        ', 되돌리기 ' + s.undos + ', ' + Math.round(s.sec / 60) + '분';
+    });
+    const endless = app.playlog.filter((a) => a.mode !== 'stage');
+    if (endless.length) lines.push('끝없는 도전/오늘: ' + endless.length + '판, 최고 ' + app.stats.bestLevel + '단계 완료');
+    lines.push('설정: 칸 표시 ' + app.settings.hints + ', 표시 ' + app.settings.display);
+    let text = lines.join('\n');
+    if (text.length > 1800) text = text.slice(0, 1800) + '\n…';
+    return text;
+  }
+
+  function feedbackURL(template, withLog) {
+    const q = new URLSearchParams({ template, version: versionLabel(), device: deviceInfo(), context: gameContext() });
+    if (withLog) q.set('playlog', playSummary());
+    return 'https://github.com/' + FEEDBACK_REPO + '/issues/new?' + q.toString();
+  }
+
+  function showFeedback() {
+    const body = document.createElement('div');
+    body.innerHTML = '<p>GitHub에 의견을 남기는 화면이 열려요(GitHub 계정 필요). 버전·기기·지금 하는 스테이지가 미리 채워져요.</p>' +
+      '<label class="check"><input type="checkbox" id="fb-log"> 내 플레이 요약 첨부 <small>(스테이지별 시도·클리어 수. 공개 게시판에 올라가요)</small></label>';
+    const open = (tpl) => () => {
+      const withLog = !!body.querySelector('#fb-log').checked;
+      window.open(feedbackURL(tpl, withLog), '_blank', 'noopener');
+    };
+    openModal({
+      title: '의견 보내기',
+      body,
+      buttons: [
+        { label: '난이도·재미 의견', primary: true, onClick: open('difficulty.yml') },
+        { label: '버그 신고', onClick: open('bug.yml') },
+        { label: '제안·기타', onClick: open('idea.yml') },
+        { label: '닫기' }
+      ]
+    });
   }
 
   function confirmThen(title, text, label, fn) {
@@ -2414,6 +2489,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
     } else {
       buttons.push({ label: '새 도전', primary: !LSF.canUndo(g), onClick: newFreeGame });
     }
+    buttons.push({ label: '의견 보내기', className: 'quiet', onClick: showFeedback });
     const outOfMoves = LSF.movesLeft(g) === 0;
     if (g.mode === 'daily') {
       openModal({
@@ -2454,7 +2530,8 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
         buttons: [
           hasNext ? { label: '다음 스테이지', primary: true, onClick: () => startStage(n + 1) } : { label: '모든 스테이지 완료!', disabled: true },
           { label: '다시 하기', onClick: () => startStage(n, true) },
-          { label: '스테이지 목록', onClick: showStageSelect }
+          { label: '스테이지 목록', onClick: showStageSelect },
+          { label: '의견 보내기', className: 'quiet', onClick: showFeedback }
         ]
       });
       return;
@@ -2463,6 +2540,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
     if (LSF.canUndo(g)) buttons.push({ label: '수 수정하기 (' + g.undoLeft + '회 남음)', primary: true, onClick: doUndo });
     buttons.push({ label: '처음부터 다시', primary: !LSF.canUndo(g), onClick: () => startStage(n, true) });
     buttons.push({ label: '스테이지 목록', onClick: showStageSelect });
+    buttons.push({ label: '의견 보내기', className: 'quiet', onClick: showFeedback });
     openModal({
       title: '아쉬워요',
       body: '<p>' + (LSF.movesLeft(g) === 0 ? '수를 다 썼어요.' : '더 둘 곳이 없어요.') +
@@ -2506,11 +2584,11 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
       { label: '기록', onClick: showStats },
       { label: '설정', onClick: showSettings },
       { label: '튜토리얼 다시 하기', onClick: startTutorial },
+      { label: '의견 보내기', onClick: showFeedback },
       { label: '테스트 기록 복사 (' + app.playlog.length + '건)', onClick: exportPlaylog },
       { label: '닫기' }
     ].map((it) => Object.assign({ className: 'menu-item' }, it));
-    const version = '0.1.0'; // stamped by scripts/build.mjs
-    openModal({ title: '메뉴', body: '<p class="small">사각사각 ' + (version.indexOf('_') === 0 ? '개발판' : 'v' + version) + '</p>', buttons: items });
+    openModal({ title: '메뉴', body: '<p class="small">사각사각 ' + versionLabel() + '</p>', buttons: items });
   }
 
   function showRules() {

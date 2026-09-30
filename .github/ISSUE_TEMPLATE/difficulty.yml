@@ -1,0 +1,57 @@
+name: 난이도·재미 의견
+description: 스테이지가 너무 쉽거나 어려웠나요? 재미있었나요?
+title: "[난이도] "
+labels: ["feedback", "difficulty"]
+body:
+  - type: markdown
+    attributes:
+      value: 게임 안 **메뉴 → 의견 보내기**로 열면 아래 정보가 자동으로 채워져요. 감사합니다!
+  - type: input
+    id: context
+    attributes:
+      label: 어디에서
+      description: 스테이지 번호나 모드
+      placeholder: 스테이지 7
+    validations:
+      required: true
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: 난이도는 어땠나요?
+      options:
+        - 너무 쉬움
+        - 조금 쉬움
+        - 적당함
+        - 조금 어려움
+        - 너무 어려움
+    validations:
+      required: true
+  - type: dropdown
+    id: fun
+    attributes:
+      label: 재미는 어땠나요?
+      options:
+        - 매우 재미있음
+        - 재미있음
+        - 보통
+        - 지루함
+        - 답답함
+  - type: textarea
+    id: comment
+    attributes:
+      label: 하고 싶은 말
+      description: 어디서 막혔는지, 무엇이 좋았는지 자유롭게 적어 주세요.
+  - type: input
+    id: version
+    attributes:
+      label: 버전
+  - type: input
+    id: device
+    attributes:
+      label: 기기
+  - type: textarea
+    id: playlog
+    attributes:
+      label: 플레이 요약 (선택)
+      description: 게임에서 '내 플레이 요약 첨부'를 켜면 채워져요. 공개적으로 게시됩니다.
+      render: text
