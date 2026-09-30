@@ -1,0 +1,2841 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#FBF8F3">
+  <meta name="description" content="사각사각 — 눈이 편안한 종이 퍼즐. 서로 다른 넷을 모아 별로, 별 넷을 모아 왕관으로.">
+  <title>사각사각</title>
+  <style>
+/* 사각사각 (Latin Square Fusion) — eye-comfort styles. Palette: docs/GDD.md §11. */
+
+:root {
+  --bg: #FBF8F3;
+  --bg-2: #F4EFEB;
+  --surface: #FFFDF9;
+  --grid: #D0C7B8;
+  --line: #8C8275;
+  --ink: #2C302E;
+  --ink-soft: #5E5A52;
+  --ink-faint: #6F665A; /* 5.3:1 on --bg (WCAG AA for small text) */
+  --quad: #F1EBE2;
+  --cell: #F8F4EE;
+  --sand: #EFE6D8;
+  --amber: #E8B98A;
+  --amber-bg: #F6E3CF;
+  --focus: #6F8BA4;
+
+  --k1-bg: #E3EADF; --k1-ink: #4B6848;
+  --k2-bg: #F1DED4; --k2-ink: #8A4E3A;
+  --k3-bg: #DCE4EC; --k3-ink: #44617B;
+  --k4-bg: #F0E5CC; --k4-ink: #7E6428;
+  --star-bg: #EDE3C8; --star-ink: #8F7026;
+  --crown-ink: #A7843A;
+
+  --shadow: 0 1px 0 rgba(90, 76, 58, .10), 0 2px 6px rgba(90, 76, 58, .08);
+  --radius: 14px;
+  --fs: 1;
+  --dur: 1;
+
+  --board: min(92vw, 520px, calc(100dvh - 330px));
+  --gap: calc(var(--board) * 0.018);
+  --qgap: calc(var(--board) * 0.035);
+  --cell-size: calc((var(--board) - 2 * var(--gap) - var(--qgap)) / 4);
+  --tile: clamp(56px, calc(var(--board) * 0.21), 104px);
+
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --bg: #24211D;
+  --bg-2: #2B2823;
+  --surface: #302C27;
+  --grid: #4A443B;
+  --line: #7A7163;
+  --ink: #E6DDCD;
+  --ink-soft: #BDB3A2;
+  --ink-faint: #A0978A; /* 5.4:1 on the night --bg */
+  --quad: #2C2924;
+  --cell: #34302A;
+  --sand: #3A352E;
+  --amber: #B9875A;
+  --amber-bg: #4A3829;
+  --focus: #9DB4C9;
+
+  --k1-bg: #323A30; --k1-ink: #A9C4A3;
+  --k2-bg: #3E2F29; --k2-ink: #DDA48F;
+  --k3-bg: #2D3641; --k3-ink: #A3BDD4;
+  --k4-bg: #3C3527; --k4-ink: #D8BE7F;
+  --star-bg: #3F3826; --star-ink: #D9B75E;
+  --crown-ink: #D9B45E;
+
+  --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 2px 6px rgba(0, 0, 0, .2);
+  color-scheme: dark;
+}
+
+html[data-text="2"] { --fs: 1.12; }
+html[data-text="3"] { --fs: 1.25; }
+html[data-motion="reduce"] { --dur: 0.01; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+body { overflow: hidden; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+svg { display: block; }
+
+#app {
+  height: 100dvh;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 12px);
+  gap: 10px;
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+}
+.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: var(--ink-soft); stroke-width: 2; stroke-linecap: round; }
+.icon-btn:active { background: var(--bg-2); }
+
+.title {
+  margin: 0;
+  text-align: center;
+  font-size: calc(17px * var(--fs));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-soft);
+}
+
+.mode-toggle {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--grid);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-toggle .seg {
+  display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  min-width: 58px; height: 32px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: calc(14px * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  transition: background calc(200ms * var(--dur)), color calc(200ms * var(--dur));
+}
+.mode-toggle .seg svg { width: 13px; height: 13px; }
+.mode-toggle .seg.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* ---------- HUD ---------- */
+.hud {
+  width: min(100%, max(var(--board), 340px));
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat {
+  background: var(--bg-2);
+  border-radius: 12px;
+  padding: 6px 10px 8px;
+  text-align: center;
+}
+.stat .label { display: block; font-size: calc(12px * var(--fs)); color: var(--ink-faint); }
+.stat .value { display: inline-flex; align-items: center; gap: 4px; font-size: calc(22px * var(--fs)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.crown-icon svg { width: calc(20px * var(--fs)); height: calc(20px * var(--fs)); fill: var(--crown-ink); fill-opacity: .2; stroke: var(--crown-ink); stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; }
+.mode-toggle .seg svg { fill: none; stroke: currentColor; stroke-width: 9; stroke-linejoin: round; }
+.bump { animation: bump calc(420ms * var(--dur)) ease; }
+
+.mode-badge {
+  font-size: calc(13px * var(--fs));
+  color: var(--ink-faint);
+  min-height: 1.2em;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* ---------- Goal card ---------- */
+.goal-card {
+  width: min(100%, max(var(--board), 340px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 14px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow);
+  font-size: calc(15px * var(--fs));
+}
+.goal-card[hidden] { display: none; }
+.goal-title { font-size: calc(13px * var(--fs)); font-weight: 600; color: var(--ink-soft); flex-shrink: 0; text-align: left; line-height: 1.25; }
+.goal-title small { font-weight: 400; font-size: calc(11px * var(--fs)); color: var(--ink-faint); }
+.mode-badge[hidden] { display: none; }
+.goal-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.goal-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px 3px 5px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.goal-chip b { color: var(--ink); font-size: 1.08em; }
+.goal-chip.done { background: var(--k1-bg); color: var(--k1-ink); }
+.goal-chip.done b { color: var(--k1-ink); }
+.moves-left { display: flex; flex-direction: column; align-items: center; line-height: 1.1; flex-shrink: 0; min-width: 56px; }
+.moves-left small { font-size: calc(11px * var(--fs)); color: var(--ink-faint); }
+.moves-left b { font-size: calc(24px * var(--fs)); font-variant-numeric: tabular-nums; }
+.moves-left.low b { color: var(--k2-ink); }
+.goal-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: var(--ink-soft); }
+.inline-icon { display: inline-grid; place-items: center; vertical-align: -0.35em; width: 1.6em; height: 1.6em; margin: 0 1px; }
+.inline-icon svg { width: 90%; height: 90%; }
+.line-icon svg { fill: var(--sand); stroke: var(--line); stroke-width: 6; }
+
+/* ---------- Board ---------- */
+.board-area {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
+  padding-bottom: 30px; /* room for the toast overlay */
+}
+
+.board {
+  position: relative;
+  width: var(--board);
+  height: var(--board);
+  display: grid;
+  grid-template-columns: var(--cell-size) var(--cell-size) var(--qgap) var(--cell-size) var(--cell-size);
+  grid-template-rows: var(--cell-size) var(--cell-size) var(--qgap) var(--cell-size) var(--cell-size);
+  column-gap: 0;
+  row-gap: 0;
+}
+.board .quad {
+  background: var(--quad);
+  border: 1px solid var(--grid);
+  border-radius: calc(var(--radius) + 4px);
+  margin: calc(var(--gap) * -0.6);
+  pointer-events: none;
+}
+.board .cell {
+  position: relative;
+  margin: calc(var(--gap) / 2);
+  border-radius: var(--radius);
+  background: var(--cell);
+  border: 1px dashed var(--grid);
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  transition: background calc(180ms * var(--dur)), border-color calc(180ms * var(--dur));
+}
+.board .cell.filled { border-style: solid; border-color: transparent; background: transparent; }
+
+/* Hints */
+.board .cell.legal::after {
+  content: "";
+  width: 18%; height: 18%;
+  border-radius: 50%;
+  background: var(--line);
+  opacity: .35;
+}
+.board .cell.fuse-hint { border: 2px solid var(--star-ink); border-style: solid; }
+.board .cell.crown-hint { border: 2.5px solid var(--crown-ink); border-style: solid; background: var(--star-bg); }
+.board .cell.clear-hint { border: 2px dashed var(--line); }
+.board .cell.danger-hint { border: 2.5px dashed var(--amber); background: var(--amber-bg); }
+.board .cell.target { animation: breathe calc(1600ms * var(--dur)) ease-in-out infinite; border: 2.5px solid var(--focus); border-style: solid; }
+.board .cell.conflict .tile { box-shadow: 0 0 0 4px var(--amber) inset; background: var(--amber-bg); }
+.board .cell.conflict-target { background: var(--amber-bg); border-color: var(--amber); }
+
+/* ---------- Tiles ---------- */
+.tile {
+  width: 100%; height: 100%;
+  border-radius: var(--radius);
+  display: grid; place-items: center;
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: transform calc(260ms * var(--dur)) ease, opacity calc(260ms * var(--dur)) ease, box-shadow calc(200ms * var(--dur));
+}
+.tile .num { font-size: calc(var(--cell-size) * 0.46); }
+.tile svg { width: 52%; height: 52%; fill: none; stroke: currentColor; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; }
+.tile.k1 { background: var(--k1-bg); color: var(--k1-ink); }
+.tile.k2 { background: var(--k2-bg); color: var(--k2-ink); }
+.tile.k3 { background: var(--k3-bg); color: var(--k3-ink); }
+.tile.k4 { background: var(--k4-bg); color: var(--k4-ink); }
+.tile.k5 { background: var(--star-bg); color: var(--star-ink); }
+.tile.k5 svg { fill: currentColor; fill-opacity: .18; }
+.tile.k9 { background: var(--star-bg); color: var(--crown-ink); }
+.tile.k9 svg { fill: currentColor; fill-opacity: .2; stroke-width: 5; }
+
+.tile.pop { animation: pop-in calc(200ms * var(--dur)) ease-out; }
+.tile.fusing { box-shadow: 0 0 0 3px var(--star-ink) inset, var(--shadow); }
+.tile.lining { box-shadow: 0 0 0 3px var(--line) inset, var(--shadow); }
+.tile.clearing { transform: scale(.55); opacity: 0; }
+.tile.spawn { animation: spawn calc(420ms * var(--dur)) ease-out; }
+.tile.crowning { animation: crown-rise calc(700ms * var(--dur)) ease-in forwards; }
+
+/* ---------- Queue ---------- */
+.tray { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.queue { display: flex; gap: calc(var(--tile) * 0.22); justify-content: center; }
+.qslot {
+  width: var(--tile); height: var(--tile);
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--grid);
+  display: grid; place-items: center;
+  transition: transform calc(180ms * var(--dur)) ease;
+}
+.qslot .tile .num { font-size: calc(var(--tile) * 0.46); }
+.qslot.has-tile { border-color: transparent; }
+.qslot.selected { transform: translateY(-8px); }
+.qslot.selected .tile { box-shadow: 0 0 0 3px var(--ink-soft), 0 6px 14px rgba(90, 76, 58, .16); }
+.qslot.stuck .tile { opacity: .45; }
+.qslot.enter .tile { animation: rise-in calc(320ms * var(--dur)) ease-out both; }
+.qslot:nth-child(2).enter .tile { animation-delay: calc(60ms * var(--dur)); }
+.qslot:nth-child(3).enter .tile { animation-delay: calc(120ms * var(--dur)); }
+.qslot.nudge { animation: nudge calc(500ms * var(--dur)) ease; }
+
+.upcoming-wrap { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.upcoming-wrap[hidden] { display: none; }
+.upcoming-label { font-size: calc(12px * var(--fs)); color: var(--ink-faint); }
+.upcoming { display: flex; gap: 6px; }
+.upcoming .tile { width: 28px; height: 28px; border-radius: 8px; box-shadow: none; opacity: .75; }
+.upcoming .tile .num { font-size: 15px; }
+.upcoming .tile svg { stroke-width: 9; }
+
+/* ---------- Actions ---------- */
+.actions { display: flex; gap: 10px; width: min(100%, max(var(--board), 340px)); }
+.action-btn {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--grid);
+  font-size: calc(16px * var(--fs));
+  font-weight: 600;
+  color: var(--ink);
+}
+.action-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.action-btn:active { background: var(--sand); }
+.action-btn:disabled { opacity: .45; cursor: default; }
+.pill {
+  min-width: 24px; height: 24px; padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  font-size: calc(13px * var(--fs));
+  display: inline-grid; place-items: center;
+}
+
+/* ---------- Toast, floats, coach ---------- */
+.toast {
+  position: absolute;
+  left: 0; right: 0; bottom: 4px;
+  pointer-events: none;
+  min-height: 1.5em;
+  font-size: calc(15px * var(--fs));
+  color: var(--ink-soft);
+  opacity: 0;
+  transition: opacity calc(250ms * var(--dur));
+  text-align: center;
+}
+.toast.show { opacity: 1; }
+
+.float-layer { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+.float-pts {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: calc(20px * var(--fs));
+  color: var(--star-ink);
+  animation: float-up calc(900ms * var(--dur)) ease-out forwards;
+}
+
+.coach {
+  width: min(100%, max(var(--board), 340px));
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  font-size: calc(15px * var(--fs));
+  line-height: 1.55;
+}
+.coach[hidden] { display: none; }
+.coach .coach-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: calc(13px * var(--fs)); color: var(--ink-faint); }
+.coach .coach-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.coach .ok { color: var(--k1-ink); font-weight: 700; }
+.link-btn { color: var(--ink-faint); text-decoration: underline; text-underline-offset: 3px; padding: 6px 4px; font-size: calc(13px * var(--fs)); }
+
+.inline-tile { display: inline-grid; vertical-align: -0.35em; width: 1.6em; height: 1.6em; margin: 0 1px; }
+.inline-tile .tile { border-radius: 6px; box-shadow: none; }
+.inline-tile .tile .num { font-size: 1em; }
+.inline-tile .tile svg { stroke-width: 9; width: 62%; height: 62%; }
+
+/* ---------- Modals ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(60, 52, 42, .28);
+  display: grid; place-items: center;
+  padding: 20px;
+  animation: fade-in calc(200ms * var(--dur)) ease;
+}
+html[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, .45); }
+.modal {
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 10px 30px rgba(60, 50, 40, .18);
+  animation: modal-in calc(260ms * var(--dur)) ease;
+  font-size: calc(16px * var(--fs));
+  line-height: 1.55;
+}
+.modal h2 { margin: 0 0 10px; font-size: calc(21px * var(--fs)); }
+.modal p { margin: 6px 0; color: var(--ink-soft); }
+.modal .btn-col { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.modal .btn-row { display: flex; gap: 8px; margin-top: 16px; }
+.modal .btn-row > * { flex: 1; }
+.btn {
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--grid);
+  font-weight: 600;
+  font-size: calc(16px * var(--fs));
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:disabled { opacity: .45; }
+.menu-item { justify-content: flex-start; text-align: left; }
+
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 4px; }
+.result-grid div { background: var(--bg-2); border-radius: 12px; padding: 8px 12px; }
+.result-grid span { display: block; font-size: calc(12px * var(--fs)); color: var(--ink-faint); }
+.result-grid b { font-size: calc(22px * var(--fs)); font-variant-numeric: tabular-nums; }
+
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg-2); }
+.setting:last-of-type { border-bottom: 0; }
+.seg-group { display: inline-flex; background: var(--bg-2); border-radius: 999px; padding: 3px; gap: 2px; flex-shrink: 0; }
+.seg-group button { padding: 6px 12px; border-radius: 999px; font-size: calc(14px * var(--fs)); color: var(--ink-faint); }
+.seg-group button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); font-weight: 600; }
+.switch { width: 52px; height: 30px; border-radius: 999px; background: var(--grid); position: relative; flex-shrink: 0; transition: background calc(200ms * var(--dur)); }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); transition: transform calc(200ms * var(--dur)); }
+.switch[aria-checked="true"] { background: var(--k1-ink); }
+.switch[aria-checked="true"]::after { transform: translateX(22px); }
+
+.modal.wide { width: min(100%, 520px); }
+.center { text-align: center; }
+.rating { display: flex; justify-content: center; gap: 10px; margin: 10px 0 6px; }
+.rating span { width: 52px; height: 52px; color: var(--grid); }
+.rating span.on { color: var(--star-ink); }
+.rating svg { width: 100%; height: 100%; fill: currentColor; fill-opacity: .25; stroke: currentColor; stroke-width: 6; stroke-linejoin: round; }
+.rating span.on svg { fill-opacity: .55; animation: spawn calc(420ms * var(--dur)) ease-out both; }
+.rating span.on:nth-child(2) svg { animation-delay: calc(150ms * var(--dur)); }
+.rating span.on:nth-child(3) svg { animation-delay: calc(300ms * var(--dur)); }
+.stage-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
+.stage-btn {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--grid);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.stage-btn b { font-size: calc(18px * var(--fs)); }
+.stage-btn .mini-stars { font-size: calc(10px * var(--fs)); color: var(--star-ink); letter-spacing: 1px; }
+.stage-btn:disabled { opacity: .45; }
+.stage-btn:disabled .mini-stars { color: var(--ink-faint); }
+.stage-btn.current { border: 2px solid var(--focus); }
+.intro-goal { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 14px 0 6px; }
+.goal-chip.big { font-size: calc(22px * var(--fs)); padding: 6px 16px 6px 10px; }
+.intro-limit { font-size: calc(26px * var(--fs)); color: var(--ink); }
+.small { font-size: calc(13px * var(--fs)); color: var(--ink-faint); }
+.rules { padding-left: 1.1em; margin: 8px 0; }
+.rules li { margin: 6px 0; color: var(--ink-soft); }
+.rules b { color: var(--ink); }
+
+/* ---------- Keyframes (soft only: no flashing, no shaking) ---------- */
+@keyframes pop-in { from { transform: scale(.9); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+@keyframes spawn { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes crown-rise { 0% { transform: scale(1); opacity: 1; } 40% { transform: scale(1.06); opacity: 1; } 100% { transform: translateY(-40%) scale(.6); opacity: 0; } }
+@keyframes rise-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes breathe { 0%, 100% { border-color: var(--focus); } 50% { border-color: var(--grid); } }
+@keyframes nudge { 0%, 100% { transform: none; } 50% { transform: translateY(-6px); } }
+@keyframes bump { 0% { transform: none; } 40% { transform: scale(1.12); } 100% { transform: none; } }
+@keyframes float-up { from { opacity: 0; transform: translate(-50%, -30%); } 20% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -140%); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (min-width: 700px) and (min-height: 900px) {
+  :root { --board: min(80vw, 560px, calc(100dvh - 380px)); }
+}
+/* Short phones (≈360×740 and below): slimmer chrome so the board keeps its size. */
+@media (max-height: 800px) {
+  #app { gap: 7px; padding-top: calc(env(safe-area-inset-top) + 6px); }
+  .icon-btn { width: 40px; height: 40px; }
+  .stat { padding: 3px 8px 5px; }
+  .stat .label { font-size: calc(11px * var(--fs)); }
+  .stat .value { font-size: calc(18px * var(--fs)); }
+  .goal-card { padding: 6px 10px; }
+  .moves-left b { font-size: calc(21px * var(--fs)); }
+  .coach { padding: 9px 11px; margin-bottom: 6px; font-size: calc(14px * var(--fs)); line-height: 1.45; }
+  .upcoming-wrap { min-height: 22px; }
+  .upcoming .tile { width: 22px; height: 22px; border-radius: 6px; }
+  .upcoming .tile .num { font-size: 12px; }
+  .action-btn { height: 46px; }
+  .tray { gap: 5px; }
+}
+@media (max-height: 640px) {
+  #app { gap: 6px; }
+  :root { --board: min(92vw, 520px, calc(100dvh - 290px)); }
+  .mode-badge { display: none; }
+}
+</style>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <button id="btn-menu" class="icon-btn" type="button" aria-label="메뉴 열기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <h1 class="title">사각사각</h1>
+      <button id="btn-mode" class="mode-toggle" type="button" aria-label="표시 방식 전환: 숫자 또는 도형">
+        <span class="seg" data-mode="numbers">1234</span>
+        <span class="seg" data-mode="symbols" aria-hidden="true"></span>
+      </button>
+    </header>
+
+    <section class="hud" aria-live="polite">
+      <div class="stat"><span class="label">점수</span><span id="score" class="value">0</span></div>
+      <div class="stat"><span id="best-label" class="label">최고</span><span id="best" class="value">0</span></div>
+      <div class="stat"><span class="label">왕관</span><span class="value crown-value"><span id="crown-icon" class="crown-icon" aria-hidden="true"></span><span id="crowns">0</span></span></div>
+    </section>
+
+    <div id="mode-badge" class="mode-badge">스테이지</div>
+    <div id="goal-card" class="goal-card" aria-live="polite" hidden></div>
+
+    <main class="board-area">
+      <div id="coach" class="coach" hidden></div>
+      <div id="board" class="board" role="group" aria-label="4×4 보드"></div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <section class="tray" aria-label="대기열">
+      <div id="queue" class="queue"></div>
+      <div id="upcoming-wrap" class="upcoming-wrap">
+        <span class="upcoming-label">다음</span>
+        <div id="upcoming" class="upcoming" aria-label="다음 묶음"></div>
+      </div>
+    </section>
+
+    <footer class="actions">
+      <button id="btn-undo" class="action-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        <span>수 수정하기</span><span id="undo-count" class="pill">3</span>
+      </button>
+      <button id="btn-new" class="action-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+        <span>새 게임</span>
+      </button>
+    </footer>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="float-layer" class="float-layer" aria-hidden="true"></div>
+
+  <script>
+/*
+ * 사각사각 (Latin Square Fusion) — game engine.
+ * Pure logic, no DOM. Rules are specified in docs/GDD.md; keep the two in sync.
+ * Works as a browser global (window.LSF) and as a CommonJS module (Node tests).
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.LSF = api;
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Constants
+  // ---------------------------------------------------------------------------
+  var SIZE = 4;
+  var CELLS = SIZE * SIZE;
+  var EMPTY = 0;
+  var STAR = 5;   // Tier 2: made by a 2x2 box fusion, wildcard
+  var CROWN = 9;  // Tier 3: made by a box fusion that uses a star, collected immediately
+  var KINDS = [1, 2, 3, 4]; // Tier 1
+  var QUEUE_SIZE = 3;
+  var BAG_COPIES = 2;
+  var UNDO_START = 3;
+  var UNDO_MAX = 5;
+  var HISTORY_MAX = UNDO_MAX;
+  var SCORE = { place: 1, line: 5, star: 20, crown: 100, goal: 50 };
+  var SAVE_VERSION = 2; // v2: box-growth rules + stages (v1 saves are discarded)
+
+  function isTier1(v) { return v >= 1 && v <= 4; }
+
+  // ---------------------------------------------------------------------------
+  // Groups: 4 rows, 4 columns, 4 fixed 2x2 quadrants
+  // ---------------------------------------------------------------------------
+  var GROUPS = [];
+  (function buildGroups() {
+    var r, c, i;
+    for (r = 0; r < SIZE; r++) {
+      var row = [];
+      for (c = 0; c < SIZE; c++) row.push(r * SIZE + c);
+      GROUPS.push({ type: 'row', index: r, cells: row });
+    }
+    for (c = 0; c < SIZE; c++) {
+      var col = [];
+      for (r = 0; r < SIZE; r++) col.push(r * SIZE + c);
+      GROUPS.push({ type: 'col', index: c, cells: col });
+    }
+    for (i = 0; i < 4; i++) {
+      var r0 = Math.floor(i / 2) * 2, c0 = (i % 2) * 2;
+      GROUPS.push({
+        type: 'box', index: i,
+        cells: [r0 * SIZE + c0, r0 * SIZE + c0 + 1, (r0 + 1) * SIZE + c0, (r0 + 1) * SIZE + c0 + 1]
+      });
+    }
+  })();
+
+  var GROUPS_OF = [];
+  (function () {
+    for (var idx = 0; idx < CELLS; idx++) GROUPS_OF.push([]);
+    GROUPS.forEach(function (g, gi) {
+      g.cells.forEach(function (idx) { GROUPS_OF[idx].push(gi); });
+    });
+  })();
+
+  function rowOf(idx) { return Math.floor(idx / SIZE); }
+  function colOf(idx) { return idx % SIZE; }
+  function boxOf(idx) { return Math.floor(rowOf(idx) / 2) * 2 + Math.floor(colOf(idx) / 2); }
+
+  // ---------------------------------------------------------------------------
+  // Seeded RNG (mulberry32). State is a single uint32 stored in the game state
+  // so undo/save restore the exact same future supply.
+  // ---------------------------------------------------------------------------
+  function rngNext(state) {
+    var t = (state.rng + 0x6D2B79F5) >>> 0;
+    state.rng = t;
+    var r = Math.imul(t ^ (t >>> 15), t | 1);
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  }
+
+  // FNV-1a string hash → uint32 seed.
+  function hashSeed(str) {
+    str = String(str);
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fair supply: shuffled bag of 4 kinds x BAG_COPIES (7-bag style)
+  // ---------------------------------------------------------------------------
+  function drawKind(state) {
+    if (!state.bag.length) {
+      var bag = [];
+      for (var n = 0; n < BAG_COPIES; n++) bag = bag.concat(KINDS);
+      for (var i = bag.length - 1; i > 0; i--) {
+        var j = Math.floor(rngNext(state) * (i + 1));
+        var tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp;
+      }
+      state.bag = bag;
+    }
+    return state.bag.shift();
+  }
+
+  function drawBundle(state) {
+    var out = [];
+    for (var i = 0; i < QUEUE_SIZE; i++) out.push(drawKind(state));
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Game creation
+  // ---------------------------------------------------------------------------
+  /**
+   * @param {object} [opts]
+   * @param {string|number} [opts.seed]  any string/number; random if omitted
+   * @param {string} [opts.mode]         'free' | 'daily' | 'stage' | 'tutorial'
+   * @param {number[]} [opts.board]      16 cells preset (tutorial/tests)
+   * @param {number[]} [opts.queue]      preset queue (0 = used slot)
+   * @param {number[]} [opts.upcoming]   preset next bundle
+   * @param {number} [opts.undoLeft]
+   * @param {{stars?:number, lines?:number, crowns?:number}} [opts.goal]  stage goal
+   * @param {number} [opts.limit]        stage move limit
+   * @param {number} [opts.stage]        stage number (1-based)
+   */
+  function createGame(opts) {
+    opts = opts || {};
+    var seed = opts.seed !== undefined ? String(opts.seed)
+      : String(Date.now()) + '-' + Math.floor(Math.random() * 1e9);
+    var state = {
+      v: SAVE_VERSION,
+      seed: seed,
+      mode: opts.mode || 'free',
+      board: opts.board ? opts.board.slice() : new Array(CELLS).fill(EMPTY),
+      queue: null,
+      upcoming: null,
+      bag: [],
+      rng: hashSeed(seed),
+      score: 0,
+      crowns: 0,
+      moves: 0,
+      made: { stars: 0, lines: 0, crowns: 0 },
+      goal: opts.goal || null,
+      limit: opts.limit || null,
+      stage: opts.stage || null,
+      endless: opts.endless !== undefined ? !!opts.endless : (opts.mode || 'free') === 'free' || opts.mode === 'daily',
+      level: 0,
+      goalBase: { stars: 0, lines: 0, crowns: 0 },
+      undoLeft: opts.undoLeft !== undefined ? opts.undoLeft : UNDO_START,
+      undosUsed: 0,
+      history: [],
+      over: false,
+      result: null // 'won' | 'lost' once over
+    };
+    state.queue = opts.queue ? opts.queue.slice() : drawBundle(state);
+    state.upcoming = opts.upcoming ? opts.upcoming.slice() : drawBundle(state);
+    if (state.endless) startLevel(state, 1);
+    updateOver(state);
+    return state;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Goals (stage mode)
+  // ---------------------------------------------------------------------------
+  var GOAL_KEYS = ['stars', 'lines', 'crowns'];
+
+  // Endless mode: moves a good player needs per goal item (measured with scripts/simulate.mjs,
+  // see DECISIONS D-16). Budgets are these costs × a slack that shrinks with the level.
+  var GOAL_COST = { stars: 6.5, lines: 5.5, crowns: 7 };
+  var CARRY_MAX = 10; // leftover moves carried into the next goal, at most
+
+  /** Progress toward the current goal (counts since the goal started). */
+  function goalProgress(state) {
+    var out = {};
+    GOAL_KEYS.forEach(function (k) {
+      out[k] = (state.made[k] || 0) - ((state.goalBase && state.goalBase[k]) || 0);
+    });
+    return out;
+  }
+
+  function goalMet(state) {
+    if (!state.goal) return false;
+    var p = goalProgress(state);
+    return GOAL_KEYS.every(function (k) { return p[k] >= (state.goal[k] || 0); });
+  }
+
+  /** Deterministic goal for endless level `level` (1-based), independent of the tile supply. */
+  function endlessGoal(seed, level) {
+    if (level === 1) return { stars: 1 };
+    if (level === 2) return { lines: 2 };
+    if (level === 3) return { crowns: 1 };
+    var st = { rng: hashSeed(seed + ':goal:' + level) };
+    var base = 1 + Math.floor(level / 4);
+    var pick = GOAL_KEYS.slice();
+    var goal = {};
+    var n = rngNext(st) < 0.5 ? 1 : 2;
+    for (var i = 0; i < n; i++) {
+      var k = pick.splice(Math.floor(rngNext(st) * pick.length), 1)[0];
+      goal[k] = k === 'crowns' ? base : base + 1 + Math.floor(rngNext(st) * 2);
+    }
+    return goal;
+  }
+
+  function endlessBudget(goal, level) {
+    var cost = 0;
+    GOAL_KEYS.forEach(function (k) { cost += (goal[k] || 0) * GOAL_COST[k]; });
+    var slack = Math.max(1.15, 1.7 - 0.05 * (level - 1));
+    return Math.ceil(cost * slack);
+  }
+
+  /** Start endless level `level`: new goal, progress baseline, budget added to moves left. */
+  function startLevel(state, level) {
+    state.level = level;
+    state.goal = endlessGoal(state.seed, level);
+    state.goalBase = copy(state.made);
+    var left = state.limit ? Math.min(CARRY_MAX, Math.max(0, state.limit - state.moves)) : 0;
+    state.limit = state.moves + left + endlessBudget(state.goal, level);
+  }
+
+  function movesLeft(state) {
+    return state.limit ? Math.max(0, state.limit - state.moves) : Infinity;
+  }
+
+  /** 0 = not cleared; 1..3 by share of the move limit left over. */
+  function starRating(state) {
+    if (state.result !== 'won') return 0;
+    if (!state.limit) return 3;
+    var left = movesLeft(state) / state.limit;
+    return left >= 0.3 ? 3 : left >= 0.12 ? 2 : 1;
+  }
+
+  /** @returns {number} endless levels cleared by this update (0 or more) */
+  function updateOver(state) {
+    var cleared = 0;
+    while (state.endless && goalMet(state)) {
+      state.score += SCORE.goal * state.level;
+      startLevel(state, state.level + 1);
+      cleared++;
+    }
+    if (!state.endless && goalMet(state)) { state.over = true; state.result = 'won'; return cleared; }
+    if ((state.limit && state.moves >= state.limit) || !hasLegalMove(state)) {
+      state.over = true; state.result = state.goal && !state.endless ? 'lost' : 'over';
+      return cleared;
+    }
+    state.over = false; state.result = null;
+    return cleared;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Placement rule (Latin square)
+  // ---------------------------------------------------------------------------
+  /** Cells in the same row/column holding the same Tier 1 kind. */
+  function latinConflicts(board, idx, kind) {
+    var out = [];
+    var r = rowOf(idx), c = colOf(idx);
+    for (var k = 0; k < SIZE; k++) {
+      var a = r * SIZE + k, b = k * SIZE + c;
+      if (a !== idx && board[a] === kind) out.push(a);
+      if (b !== idx && board[b] === kind) out.push(b);
+    }
+    return out;
+  }
+
+  /** @returns {{ok:boolean, reason?:string, conflicts:number[]}} */
+  function checkPlacement(board, idx, kind) {
+    if (idx < 0 || idx >= CELLS || !isTier1(kind)) return { ok: false, reason: 'invalid', conflicts: [] };
+    if (board[idx] !== EMPTY) return { ok: false, reason: 'occupied', conflicts: [] };
+    var conflicts = latinConflicts(board, idx, kind);
+    if (conflicts.length) return { ok: false, reason: 'latin', conflicts: conflicts };
+    return { ok: true, conflicts: [] };
+  }
+
+  function legalCells(board, kind) {
+    var out = [];
+    for (var idx = 0; idx < CELLS; idx++) if (checkPlacement(board, idx, kind).ok) out.push(idx);
+    return out;
+  }
+
+  function hasLegalMove(state) {
+    for (var i = 0; i < state.queue.length; i++) {
+      if (state.queue[i] && legalCells(state.board, state.queue[i]).length) return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fusion
+  // ---------------------------------------------------------------------------
+  /**
+   * A group is complete when all 4 cells are filled, its Tier 1 tiles are all different
+   * and it holds at most one star (the star stands in for the missing symbol).
+   */
+  function isComplete(board, gi) {
+    var cells = GROUPS[gi].cells;
+    var stars = 0, seen = {};
+    for (var i = 0; i < cells.length; i++) {
+      var v = board[cells[i]];
+      if (v === EMPTY) return false;
+      if (v === STAR) { stars++; continue; }
+      if (!isTier1(v) || seen[v]) return false;
+      seen[v] = true;
+    }
+    return stars <= 1;
+  }
+
+  /**
+   * Resolve what completing groups through `focus` does. Mutates `board`. (GDD §6)
+   * - A complete 2x2 box GROWS: the focus cell becomes a star, or a crown if the box
+   *   used a star. The other 3 box cells are emptied. Crowns are collected at once.
+   * - A complete row/column only CLEARS all 4 of its cells (stars in it are lost).
+   * - Everything completed by one placement resolves together, in a single step.
+   * @returns {{steps: object[], points: number, crowns: number}}  steps has 0 or 1 entry
+   */
+  function resolve(board, focus) {
+    var done = GROUPS_OF[focus].filter(function (gi) { return isComplete(board, gi); });
+    if (!done.length) return { steps: [], points: 0, crowns: 0 };
+
+    var box = null, lines = 0;
+    done.forEach(function (gi) { if (GROUPS[gi].type === 'box') box = gi; else lines++; });
+    var wildcards = 0;
+    if (box !== null) GROUPS[box].cells.forEach(function (i) { if (board[i] === STAR) wildcards++; });
+    var spawn = box === null ? EMPTY : wildcards ? CROWN : STAR;
+
+    var cleared = [], seen = {};
+    done.forEach(function (gi) {
+      GROUPS[gi].cells.forEach(function (i) {
+        if (seen[i] || (i === focus && spawn !== EMPTY)) return;
+        seen[i] = true;
+        cleared.push(i);
+      });
+    });
+    cleared.sort(function (x, y) { return x - y; });
+    cleared.forEach(function (i) { board[i] = EMPTY; });
+    board[focus] = spawn === STAR ? STAR : EMPTY; // a crown is collected, leaving the cell empty
+
+    var base = lines * SCORE.line + (spawn === STAR ? SCORE.star : spawn === CROWN ? SCORE.crown : 0);
+    var points = base * done.length; // completing several groups at once multiplies
+    var step = {
+      type: spawn === CROWN ? 'crown' : spawn === STAR ? 'star' : 'clear',
+      groups: done.map(function (gi) { return { type: GROUPS[gi].type, index: GROUPS[gi].index, cells: GROUPS[gi].cells.slice() }; }),
+      focus: focus,
+      cleared: cleared,
+      wildcards: wildcards,
+      lines: lines,
+      spawn: spawn,
+      points: points
+    };
+    return { steps: [step], points: points, crowns: spawn === CROWN ? 1 : 0 };
+  }
+  /** What would happen if `kind` were placed at `idx`? (no mutation) */
+  function previewPlacement(board, idx, kind) {
+    var check = checkPlacement(board, idx, kind);
+    if (!check.ok) return { ok: false, reason: check.reason, conflicts: check.conflicts, steps: [] };
+    var b = board.slice();
+    b[idx] = kind;
+    var res = resolve(b, idx);
+    return { ok: true, conflicts: [], steps: res.steps, points: res.points, crowns: res.crowns };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Moves, undo
+  // ---------------------------------------------------------------------------
+  var SNAPSHOT_KEYS = ['board', 'queue', 'upcoming', 'bag', 'rng', 'score', 'crowns', 'moves', 'made', 'over', 'result', 'level', 'goal', 'goalBase', 'limit'];
+
+  function copy(v) {
+    if (Array.isArray(v)) return v.slice();
+    if (v && typeof v === 'object') return JSON.parse(JSON.stringify(v));
+    return v;
+  }
+
+  function snapshot(state) {
+    var snap = {};
+    SNAPSHOT_KEYS.forEach(function (k) { snap[k] = copy(state[k]); });
+    return snap;
+  }
+
+  /**
+   * Place queue tile `qi` at board cell `idx`.
+   * @returns {{ok:false, reason:string, conflicts:number[]} |
+   *           {ok:true, idx:number, kind:number, steps:object[], points:number,
+   *            crownsGained:number, refilled:boolean, over:boolean}}
+   */
+  function place(state, qi, idx) {
+    if (state.over) return { ok: false, reason: 'over', conflicts: [] };
+    var kind = state.queue[qi];
+    if (!kind) return { ok: false, reason: 'empty-slot', conflicts: [] };
+    var check = checkPlacement(state.board, idx, kind);
+    if (!check.ok) return check;
+
+    state.history.push(snapshot(state));
+    if (state.history.length > HISTORY_MAX) state.history.shift();
+
+    state.board[idx] = kind;
+    state.queue[qi] = 0;
+    state.moves++;
+
+    var res = resolve(state.board, idx);
+    var points = SCORE.place + res.points;
+    state.score += points;
+    res.steps.forEach(function (s) {
+      state.made.lines += s.lines;
+      if (s.spawn === STAR) state.made.stars++;
+      if (s.spawn === CROWN) state.made.crowns++;
+    });
+    if (res.crowns) {
+      state.crowns += res.crowns;
+      state.undoLeft = Math.min(UNDO_MAX, state.undoLeft + res.crowns);
+    }
+
+    var refilled = false;
+    if (state.queue.every(function (q) { return !q; })) {
+      state.queue = state.upcoming;
+      state.upcoming = drawBundle(state);
+      refilled = true;
+    }
+    var levelsCleared = updateOver(state);
+
+    return {
+      ok: true, idx: idx, kind: kind, qi: qi, levelsCleared: levelsCleared,
+      steps: res.steps, points: points, crownsGained: res.crowns,
+      refilled: refilled, over: state.over, result: state.result
+    };
+  }
+
+  function canUndo(state) {
+    return state.undoLeft > 0 && state.history.length > 0;
+  }
+
+  function undo(state) {
+    if (!canUndo(state)) return false;
+    var snap = state.history.pop();
+    SNAPSHOT_KEYS.forEach(function (k) { state[k] = snap[k]; });
+    state.undoLeft--;
+    state.undosUsed++;
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persistence
+  // ---------------------------------------------------------------------------
+  function serialize(state) { return JSON.stringify(state); }
+
+  function isIntArray(a, len) {
+    return Array.isArray(a) && (len === undefined || a.length === len) &&
+      a.every(function (x) { return typeof x === 'number' && x === Math.floor(x); });
+  }
+
+  /** @returns {object|null} a valid state, or null if the data is unusable */
+  function deserialize(json) {
+    try {
+      var s = typeof json === 'string' ? JSON.parse(json) : json;
+      if (!s || s.v !== SAVE_VERSION) return null;
+      if (!isIntArray(s.board, CELLS) || !isIntArray(s.queue, QUEUE_SIZE) ||
+          !isIntArray(s.upcoming, QUEUE_SIZE) || !isIntArray(s.bag)) return null;
+      if (!s.board.every(function (v) { return v === EMPTY || v === STAR || isTier1(v); })) return null;
+      if (typeof s.rng !== 'number' || typeof s.score !== 'number') return null;
+      if (!s.made || typeof s.made !== 'object') return null;
+      if (!Array.isArray(s.history)) s.history = [];
+      return s;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Daily puzzle helpers
+  // ---------------------------------------------------------------------------
+  function dateKey(date) {
+    date = date || new Date();
+    var m = date.getMonth() + 1, d = date.getDate();
+    return date.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  function dailySeed(key) { return 'daily-' + key; }
+
+  function shareText(state, key) {
+    var crowns = '';
+    for (var i = 0; i < Math.min(state.crowns, 10); i++) crowns += '♛';
+    return [
+      '사각사각 · 오늘의 퍼즐 ' + key,
+      '점수 ' + state.score + ' · 왕관 ' + state.crowns + (crowns ? ' ' + crowns : ''),
+      '별 ' + state.made.stars + ' · 줄 ' + state.made.lines + ' · ' + state.moves + '수'
+    ].join('\n');
+  }
+
+  return {
+    SIZE: SIZE, CELLS: CELLS, EMPTY: EMPTY, STAR: STAR, CROWN: CROWN, KINDS: KINDS,
+    QUEUE_SIZE: QUEUE_SIZE, CARRY_MAX: CARRY_MAX, UNDO_START: UNDO_START, UNDO_MAX: UNDO_MAX, SCORE: SCORE,
+    GROUPS: GROUPS, GROUPS_OF: GROUPS_OF,
+    rowOf: rowOf, colOf: colOf, boxOf: boxOf, isTier1: isTier1,
+    hashSeed: hashSeed,
+    createGame: createGame,
+    checkPlacement: checkPlacement, legalCells: legalCells, hasLegalMove: hasLegalMove,
+    isComplete: isComplete, resolve: resolve, previewPlacement: previewPlacement,
+    place: place, canUndo: canUndo, undo: undo,
+    goalMet: goalMet, goalProgress: goalProgress, endlessGoal: endlessGoal, endlessBudget: endlessBudget, movesLeft: movesLeft, starRating: starRating, GOAL_KEYS: GOAL_KEYS,
+    serialize: serialize, deserialize: deserialize,
+    dateKey: dateKey, dailySeed: dailySeed, shareText: shareText
+  };
+});
+</script>
+  <script>
+/*
+ * 사각사각 — stage table. GENERATED by scripts/gen-stages.mjs; do not edit by hand.
+ * Each stage: fixed seed (same supply every attempt), goal, move limit, and the bot's
+ * clear rate at that limit (difficulty reference for playtest analysis).
+ */
+(function (root) {
+  var STAGES = [
+    {
+      "stage": 1,
+      "seed": "stage-1-0",
+      "goal": {
+        "stars": 1
+      },
+      "limit": 12,
+      "clearRate": 1
+    },
+    {
+      "stage": 2,
+      "seed": "stage-5-0",
+      "goal": {
+        "crowns": 1
+      },
+      "limit": 12,
+      "clearRate": 1
+    },
+    {
+      "stage": 3,
+      "seed": "stage-2-0",
+      "goal": {
+        "lines": 2
+      },
+      "limit": 20,
+      "clearRate": 1
+    },
+    {
+      "stage": 4,
+      "seed": "stage-3-0",
+      "goal": {
+        "stars": 2
+      },
+      "limit": 21,
+      "clearRate": 1
+    },
+    {
+      "stage": 5,
+      "seed": "stage-4-0",
+      "goal": {
+        "stars": 1,
+        "lines": 2
+      },
+      "limit": 26,
+      "clearRate": 1
+    },
+    {
+      "stage": 6,
+      "seed": "stage-11-0",
+      "goal": {
+        "crowns": 1,
+        "stars": 2
+      },
+      "limit": 18,
+      "clearRate": 1
+    },
+    {
+      "stage": 7,
+      "seed": "stage-14-0",
+      "goal": {
+        "crowns": 2
+      },
+      "limit": 19,
+      "clearRate": 1
+    },
+    {
+      "stage": 8,
+      "seed": "stage-6-0",
+      "goal": {
+        "stars": 3
+      },
+      "limit": 26,
+      "clearRate": 1
+    },
+    {
+      "stage": 9,
+      "seed": "stage-7-0",
+      "goal": {
+        "lines": 4
+      },
+      "limit": 36,
+      "clearRate": 1
+    },
+    {
+      "stage": 10,
+      "seed": "stage-10-0",
+      "goal": {
+        "stars": 4
+      },
+      "limit": 38,
+      "clearRate": 1
+    },
+    {
+      "stage": 11,
+      "seed": "stage-13-0",
+      "goal": {
+        "stars": 5
+      },
+      "limit": 44,
+      "clearRate": 1
+    },
+    {
+      "stage": 12,
+      "seed": "stage-9-0",
+      "goal": {
+        "crowns": 1,
+        "lines": 2
+      },
+      "limit": 30,
+      "clearRate": 0.94
+    },
+    {
+      "stage": 13,
+      "seed": "stage-15-0",
+      "goal": {
+        "stars": 3,
+        "lines": 5
+      },
+      "limit": 56,
+      "clearRate": 0.94
+    },
+    {
+      "stage": 14,
+      "seed": "stage-8-0",
+      "goal": {
+        "stars": 2,
+        "lines": 3
+      },
+      "limit": 38,
+      "clearRate": 0.81
+    },
+    {
+      "stage": 15,
+      "seed": "stage-12-0",
+      "goal": {
+        "lines": 6
+      },
+      "limit": 42,
+      "clearRate": 0.75
+    },
+    {
+      "stage": 16,
+      "seed": "stage-20-0",
+      "goal": {
+        "crowns": 2,
+        "stars": 2
+      },
+      "limit": 17,
+      "clearRate": 1
+    },
+    {
+      "stage": 17,
+      "seed": "stage-16-0",
+      "goal": {
+        "crowns": 1,
+        "stars": 3
+      },
+      "limit": 23,
+      "clearRate": 1
+    },
+    {
+      "stage": 18,
+      "seed": "stage-27-0",
+      "goal": {
+        "crowns": 3,
+        "stars": 3
+      },
+      "limit": 30,
+      "clearRate": 1
+    },
+    {
+      "stage": 19,
+      "seed": "stage-24-0",
+      "goal": {
+        "crowns": 2,
+        "stars": 4
+      },
+      "limit": 34,
+      "clearRate": 1
+    },
+    {
+      "stage": 20,
+      "seed": "stage-21-0",
+      "goal": {
+        "crowns": 3
+      },
+      "limit": 35,
+      "clearRate": 1
+    },
+    {
+      "stage": 21,
+      "seed": "stage-18-0",
+      "goal": {
+        "crowns": 2,
+        "lines": 3
+      },
+      "limit": 45,
+      "clearRate": 1
+    },
+    {
+      "stage": 22,
+      "seed": "stage-19-0",
+      "goal": {
+        "stars": 6
+      },
+      "limit": 50,
+      "clearRate": 1
+    },
+    {
+      "stage": 23,
+      "seed": "stage-30-0",
+      "goal": {
+        "crowns": 4,
+        "stars": 4
+      },
+      "limit": 41,
+      "clearRate": 0.94
+    },
+    {
+      "stage": 24,
+      "seed": "stage-22-0",
+      "goal": {
+        "stars": 7
+      },
+      "limit": 57,
+      "clearRate": 0.94
+    },
+    {
+      "stage": 25,
+      "seed": "stage-29-0",
+      "goal": {
+        "crowns": 4
+      },
+      "limit": 34,
+      "clearRate": 0.88
+    },
+    {
+      "stage": 26,
+      "seed": "stage-25-0",
+      "goal": {
+        "crowns": 3,
+        "lines": 4
+      },
+      "limit": 56,
+      "clearRate": 0.88
+    },
+    {
+      "stage": 27,
+      "seed": "stage-26-0",
+      "goal": {
+        "stars": 8
+      },
+      "limit": 70,
+      "clearRate": 0.88
+    },
+    {
+      "stage": 28,
+      "seed": "stage-23-0",
+      "goal": {
+        "lines": 10,
+        "stars": 3
+      },
+      "limit": 75,
+      "clearRate": 0.69
+    },
+    {
+      "stage": 29,
+      "seed": "stage-17-0",
+      "goal": {
+        "lines": 8
+      },
+      "limit": 52,
+      "clearRate": 0.63
+    },
+    {
+      "stage": 30,
+      "seed": "stage-28-0",
+      "goal": {
+        "lines": 12
+      },
+      "limit": 68,
+      "clearRate": 0.44
+    }
+  ];
+  if (typeof module === 'object' && module.exports) module.exports = STAGES;
+  else root.LSF_STAGES = STAGES;
+})(typeof self !== 'undefined' ? self : this);
+</script>
+  <script>
+/*
+ * 사각사각 (Latin Square Fusion) — synthesized sound effects (Web Audio API) and haptics.
+ * No audio files. Everything is soft, short and low-passed (GDD §12).
+ * Exposes window.LSFAudio.
+ */
+(function (root) {
+  'use strict';
+
+  var ctx = null, master = null, noiseBuf = null;
+  var soundOn = true, hapticsOn = true;
+
+  // Pentatonic bell pitches, one step up per chain step.
+  var BELL = [523.25, 659.25, 783.99, 880.0, 1046.5];
+
+  function ensure() {
+    if (!soundOn) return null;
+    var AC = root.AudioContext || root.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) {
+      try { ctx = new AC(); } catch (e) { return null; }
+      var comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.ratio.value = 4;
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 5200;
+      master = ctx.createGain();
+      master.gain.value = 0.55;
+      master.connect(lp); lp.connect(comp); comp.connect(ctx.destination);
+
+      noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
+      var data = noiseBuf.getChannelData(0);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  /** Sine/triangle voice with exponential decay. */
+  function tone(freq, start, dur, gain, type, dest) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, start);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(gain, start + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(dest || master);
+    o.start(start); o.stop(start + dur + 0.05);
+    return o;
+  }
+
+  function noise(start, dur, gain, freq, q) {
+    var src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf;
+    bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(gain, start + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(start); src.stop(start + dur + 0.02);
+  }
+
+  function vibrate(pattern) {
+    if (hapticsOn && root.navigator && typeof root.navigator.vibrate === 'function') {
+      try { root.navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+    }
+  }
+
+  var api = {
+    /** Call from a user gesture to unlock audio on mobile. */
+    unlock: function () { ensure(); },
+    setSound: function (on) { soundOn = !!on; if (!on && ctx && ctx.state === 'running') ctx.suspend(); },
+    setHaptics: function (on) { hapticsOn = !!on; },
+
+    select: function () {
+      if (!ensure()) return;
+      tone(1320, ctx.currentTime, 0.05, 0.025, 'sine');
+    },
+
+    // Pencil/wood tap: filtered noise click + low wooden body.
+    place: function () {
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      noise(t, 0.06, 0.22, 2400, 1.2);
+      tone(190, t, 0.12, 0.16, 'sine');
+      tone(380, t, 0.06, 0.04, 'triangle');
+    },
+
+    // Low, soft "thump".
+    invalid: function () {
+      vibrate(35);
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      var o = tone(120, t, 0.22, 0.22, 'sine');
+      o.frequency.exponentialRampToValueAtTime(78, t + 0.2);
+    },
+
+    // Gentle bell; pitch rises with the chain step.
+    fusion: function (step) {
+      vibrate(12);
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      var f = BELL[Math.min(BELL.length - 1, Math.max(0, (step || 1) - 1))];
+      tone(f, t, 1.3, 0.13, 'sine');
+      tone(f * 2.0, t, 0.8, 0.035, 'sine');
+      tone(f * 2.76, t, 0.5, 0.018, 'sine');
+    },
+
+    // Music-box arpeggio.
+    crown: function () {
+      vibrate([12, 60, 12]);
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) {
+        var s = t + 0.09 * i;
+        tone(f, s, 1.6, 0.1, 'sine');
+        tone(f * 3, s, 0.4, 0.015, 'triangle');
+      });
+    },
+
+    // Line clear: a soft paper "swish" (band-passed noise sweeping down).
+    clear: function () {
+      vibrate(10);
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      var src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = noiseBuf;
+      bp.type = 'bandpass'; bp.Q.value = 0.9;
+      bp.frequency.setValueAtTime(2600, t);
+      bp.frequency.exponentialRampToValueAtTime(700, t + 0.2);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start(t); src.stop(t + 0.25);
+    },
+
+    // Goal reached: two rising bell notes.
+    goal: function () {
+      vibrate([10, 40, 10]);
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      tone(659.25, t, 0.9, 0.1, 'sine');
+      tone(987.77, t + 0.12, 1.2, 0.1, 'sine');
+    },
+
+    undo: function () {
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      tone(660, t, 0.12, 0.05, 'sine');
+      tone(495, t + 0.08, 0.16, 0.05, 'sine');
+    },
+
+    gameOver: function () {
+      if (!ensure()) return;
+      var t = ctx.currentTime;
+      [392, 329.63, 261.63].forEach(function (f, i) { tone(f, t + i * 0.16, 0.9, 0.07, 'sine'); });
+    },
+
+    vibrate: vibrate
+  };
+
+  root.LSFAudio = api;
+})(typeof self !== 'undefined' ? self : this);
+</script>
+  <script>
+/*
+ * 사각사각 (Latin Square Fusion) — UI controller.
+ * DOM rendering, tap-to-place input, animation sequencing, modals, settings,
+ * stages, endless goals, daily puzzle, tutorial and persistence.
+ * All game rules live in engine.js; the stage table in stages.js (generated).
+ */
+(function () {
+  'use strict';
+
+  const LSF = window.LSF;
+  const SFX = window.LSFAudio;
+  const STAGES = window.LSF_STAGES || [];
+  const $ = (id) => document.getElementById(id);
+
+  // ---------------------------------------------------------------------------
+  // Storage (every access guarded: private mode / blocked storage must not break the game)
+  // ---------------------------------------------------------------------------
+  const store = {
+    get(key, fallback) {
+      try {
+        const v = localStorage.getItem('lsf.' + key);
+        return v == null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set(key, val) { try { localStorage.setItem('lsf.' + key, JSON.stringify(val)); } catch (e) { /* ignore */ } }
+  };
+
+  const DEFAULT_SETTINGS = {
+    display: 'numbers', // 'numbers' | 'symbols'
+    theme: 'auto',      // 'light' | 'dark' | 'auto'
+    text: 1,            // 1 | 2 | 3
+    motion: 'auto',     // 'auto' | 'reduce'
+    sound: true,
+    haptics: true,
+    hints: 'full',      // 'full' (outcome borders) | 'legal' (dots only) | 'off'
+    preview: true
+  };
+  const DEFAULT_STATS = { games: 0, best: 0, bestLevel: 0, crowns: 0 };
+
+  const app = {
+    game: null,
+    selected: null,
+    busy: false,
+    settings: Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {})),
+    stats: Object.assign({}, DEFAULT_STATS, store.get('stats', {})),
+    daily: store.get('daily', {}),      // { 'YYYY-MM-DD': {score, level, crowns, moves, done} }
+    stageStars: store.get('stages', {}), // { [stage]: best star rating 1..3 }
+    tutorial: null,
+    modalClose: null,
+    playlog: store.get('playlog', []), // playtest attempts, exported from the menu
+    tipsSeen: store.get('tips', {})     // just-in-time tips already shown
+  };
+  // v1 settings stored hints as a boolean
+  if (app.settings.hints === true) app.settings.hints = 'full';
+  if (app.settings.hints === false) app.settings.hints = 'off';
+
+  const mqDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const mqMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+  // ---------------------------------------------------------------------------
+  // Tile graphics (inline SVG: same look on every device, no emoji glare)
+  // ---------------------------------------------------------------------------
+  const STAR_PATH = (() => {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 18 : 42;
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      pts.push((50 + r * Math.cos(a)).toFixed(1) + ' ' + (53 + r * Math.sin(a)).toFixed(1));
+    }
+    return 'M' + pts.join(' L') + ' Z';
+  })();
+
+  const SHAPES = {
+    1: '<circle cx="50" cy="50" r="36"/>',
+    2: '<path d="M50 13 L88 81 L12 81 Z"/>',
+    3: '<rect x="16" y="16" width="68" height="68" rx="7"/>',
+    4: '<path d="M50 9 L91 50 L50 91 L9 50 Z"/>',
+    5: '<path d="' + STAR_PATH + '"/>',
+    9: '<path d="M16 72 L11 30 L33 50 L50 20 L67 50 L89 30 L84 72 Z"/><path d="M18 84 H82"/>'
+  };
+  const NAMES = { 1: '동그라미', 2: '세모', 3: '네모', 4: '마름모', 5: '별', 9: '왕관' };
+  const LINE_ICON = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect x="8" y="38" width="84" height="24" rx="8"/></svg>';
+
+  function svg(v) { return '<svg viewBox="0 0 100 100" aria-hidden="true">' + SHAPES[v] + '</svg>'; }
+
+  function tileInner(v) {
+    if (app.settings.display === 'numbers') return '<span class="num">' + v + '</span>';
+    return svg(v);
+  }
+
+  function tileHTML(v) {
+    return v ? '<div class="tile k' + v + '">' + tileInner(v) + '</div>' : '';
+  }
+
+  function tileName(v) {
+    if (!v) return '빈칸';
+    return app.settings.display === 'numbers' ? (v === LSF.STAR ? '별 5' : v === LSF.CROWN ? '왕관 9' : String(v)) : NAMES[v];
+  }
+
+  function inlineTile(v) { return '<span class="inline-tile">' + tileHTML(v) + '</span>'; }
+
+  /** Replace {1}..{5},{9} tokens with inline tiles and {L} with the line icon. */
+  function withTiles(text) {
+    return text
+      .replace(/\{(\d)\}/g, (_, d) => inlineTile(Number(d)))
+      .replace(/\{L\}/g, '<span class="inline-icon line-icon">' + LINE_ICON + '</span>');
+  }
+
+  const GOAL_LABEL = { stars: '별', lines: '줄', crowns: '왕관' };
+  function goalIcon(k) {
+    return k === 'lines' ? '<span class="inline-icon line-icon">' + LINE_ICON + '</span>' : inlineTile(k === 'stars' ? LSF.STAR : LSF.CROWN);
+  }
+  function goalText(goal) {
+    return LSF.GOAL_KEYS.filter((k) => goal[k]).map((k) => GOAL_LABEL[k] + ' ' + goal[k] + '개').join(' · ');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Board DOM (built once)
+  // ---------------------------------------------------------------------------
+  const boardEl = $('board');
+  const cells = [];
+
+  function gridLine(i) { return i < 2 ? i + 1 : i + 2; } // skip the quadrant gutter track
+
+  function buildBoard() {
+    for (let q = 0; q < 4; q++) {
+      const quad = document.createElement('div');
+      quad.className = 'quad';
+      const r0 = Math.floor(q / 2) * 3 + 1, c0 = (q % 2) * 3 + 1;
+      quad.style.gridArea = r0 + ' / ' + c0 + ' / span 2 / span 2';
+      boardEl.appendChild(quad);
+    }
+    for (let idx = 0; idx < LSF.CELLS; idx++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cell';
+      b.dataset.idx = idx;
+      b.style.gridRow = gridLine(LSF.rowOf(idx));
+      b.style.gridColumn = gridLine(LSF.colOf(idx));
+      b.addEventListener('click', () => onCellTap(idx));
+      boardEl.appendChild(b);
+      cells.push(b);
+    }
+  }
+
+  function renderBoard(board, force) {
+    board.forEach((v, idx) => {
+      const cell = cells[idx];
+      if (force || cell.dataset.v !== String(v)) {
+        cell.innerHTML = tileHTML(v);
+        cell.dataset.v = String(v);
+      }
+      cell.classList.toggle('filled', v !== 0);
+      cell.setAttribute('aria-label', (LSF.rowOf(idx) + 1) + '행 ' + (LSF.colOf(idx) + 1) + '열, ' + tileName(v));
+    });
+  }
+
+  function tileAt(idx) { return cells[idx].querySelector('.tile'); }
+
+  // ---------------------------------------------------------------------------
+  // Queue / HUD / goal rendering
+  // ---------------------------------------------------------------------------
+  const queueEl = $('queue');
+  const qslots = [];
+
+  function buildQueue() {
+    for (let i = 0; i < LSF.QUEUE_SIZE; i++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'qslot';
+      b.addEventListener('click', () => onQueueTap(i));
+      queueEl.appendChild(b);
+      qslots.push(b);
+    }
+  }
+
+  function renderQueue(view, enter) {
+    const q = view || app.game.queue;
+    const hints = hintLevel() !== 'off';
+    q.forEach((v, i) => {
+      const slot = qslots[i];
+      slot.innerHTML = tileHTML(v);
+      slot.classList.toggle('has-tile', !!v);
+      slot.classList.toggle('selected', app.selected === i);
+      slot.classList.toggle('stuck', !!v && hints && !LSF.legalCells(app.game.board, v).length);
+      slot.classList.remove('enter');
+      if (enter && v) { void slot.offsetWidth; slot.classList.add('enter'); }
+      slot.disabled = !v;
+      slot.setAttribute('aria-label', v ? '대기열 ' + (i + 1) + '번: ' + tileName(v) + (app.selected === i ? ' (선택됨)' : '') : '대기열 ' + (i + 1) + '번: 사용함');
+      slot.setAttribute('aria-pressed', app.selected === i ? 'true' : 'false');
+    });
+  }
+
+  function renderUpcoming() {
+    const wrap = $('upcoming-wrap');
+    const show = app.settings.preview && app.game.mode !== 'tutorial';
+    wrap.hidden = !show;
+    if (show) $('upcoming').innerHTML = app.game.upcoming.map(tileHTML).join('');
+  }
+
+  function modeLabel(g) {
+    if (g.mode === 'stage') return '스테이지 ' + g.stage;
+    if (g.mode === 'daily') return '오늘의 퍼즐 · ' + g.dailyKey + ' · ' + g.level + '단계';
+    if (g.mode === 'tutorial') return '튜토리얼';
+    return '끝없는 도전 · ' + g.level + '단계';
+  }
+
+  function renderHud() {
+    const g = app.game;
+    $('score').textContent = g.score;
+    const bestLabel = $('best-label');
+    if (g.mode === 'stage') {
+      bestLabel.textContent = '최고 평가';
+      const s = app.stageStars[g.stage] || 0;
+      $('best').textContent = s ? '★'.repeat(s) + '☆'.repeat(3 - s) : '-';
+    } else {
+      bestLabel.textContent = '최고';
+      $('best').textContent = Math.max(app.stats.best, g.mode === 'tutorial' ? 0 : g.score);
+    }
+    $('crowns').textContent = g.crowns;
+    const undoBtn = $('btn-undo');
+    undoBtn.disabled = g.mode === 'tutorial' || !LSF.canUndo(g) || g.result === 'won';
+    $('undo-count').textContent = g.undoLeft;
+    const newBtn = $('btn-new');
+    newBtn.disabled = g.mode === 'tutorial';
+    newBtn.querySelector('span').textContent = g.mode === 'stage' ? '다시 하기' : g.mode === 'daily' ? '끝없는 도전' : '새 게임';
+    renderGoal();
+  }
+
+  function renderGoal() {
+    const g = app.game;
+    const el = $('goal-card');
+    const badge = $('mode-badge');
+    badge.textContent = modeLabel(g);
+    const showGoal = !!g.goal && g.mode !== 'tutorial';
+    badge.hidden = showGoal; // the goal card carries the mode label instead (saves a row on phones)
+    if (!showGoal) { el.hidden = true; return; }
+    el.hidden = false;
+    const prog = LSF.goalProgress(g);
+    const chips = LSF.GOAL_KEYS.filter((k) => g.goal[k]).map((k) => {
+      const have = Math.min(prog[k], g.goal[k]);
+      const done = have >= g.goal[k];
+      return '<span class="goal-chip' + (done ? ' done' : '') + '" aria-label="' + GOAL_LABEL[k] + ' ' + have + '/' + g.goal[k] + '">' +
+        goalIcon(k) + '<b>' + have + '</b>/' + g.goal[k] + '</span>';
+    }).join('');
+    const left = LSF.movesLeft(g);
+    const title = g.mode === 'stage' ? '스테이지 ' + g.stage : g.mode === 'daily' ? '오늘 · ' + g.level + '단계' : g.level + '단계';
+    el.innerHTML = '<button type="button" class="goal-title" data-act="stages">' + title + '<br><small>목표</small></button><span class="goal-chips">' + chips + '</span>' +
+      '<span class="moves-left' + (left <= 3 ? ' low' : '') + '" aria-label="남은 수 ' + left + '"><small>남은 수</small><b>' + left + '</b></span>';
+  }
+
+  function bump(id) {
+    const el = $(id);
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+
+  /** 'full' | 'legal' | 'off' — the tutorial teaches with full hints unless a step turns them off. */
+  function hintLevel() {
+    const step = app.tutorial && TUTORIAL[app.tutorial.i];
+    if (step) return step.hints === false ? 'off' : 'full';
+    return app.settings.hints;
+  }
+
+  const HINT_CLASSES = ['legal', 'fuse-hint', 'crown-hint', 'clear-hint', 'danger-hint', 'target'];
+
+  function renderHints() {
+    cells.forEach((c) => c.classList.remove(...HINT_CLASSES));
+    const step = app.tutorial && !app.tutorial.waiting && TUTORIAL[app.tutorial.i];
+    if (step && step.target != null) cells[step.target].classList.add('target');
+    const level = hintLevel();
+    if (app.selected == null || level === 'off') return;
+    const board = app.game.board;
+    const kind = app.game.queue[app.selected];
+    LSF.legalCells(board, kind).forEach((idx) => {
+      if (level === 'legal') { cells[idx].classList.add('legal'); return; }
+      const p = LSF.previewPlacement(board, idx, kind);
+      const st = p.steps[0];
+      if (!st) cells[idx].classList.add('legal');
+      else if (st.type === 'crown') cells[idx].classList.add('crown-hint');
+      else if (st.type === 'star') cells[idx].classList.add('fuse-hint');
+      else cells[idx].classList.add(st.cleared.some((i) => board[i] === LSF.STAR) ? 'danger-hint' : 'clear-hint');
+    });
+  }
+
+  function render() {
+    renderBoard(app.game.board);
+    renderQueue();
+    renderUpcoming();
+    renderHud();
+    renderHints();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feedback helpers
+  // ---------------------------------------------------------------------------
+  let toastTimer = null;
+  function toast(msg, ms) {
+    const el = $('toast');
+    el.innerHTML = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms || 1800);
+  }
+
+  function motionScale() {
+    const reduce = app.settings.motion === 'reduce' || (app.settings.motion === 'auto' && mqMotion && mqMotion.matches);
+    return reduce ? 0.05 : 1;
+  }
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms * motionScale()));
+
+  function floatPoints(idx, pts) {
+    if (!pts) return;
+    const r = cells[idx].getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'float-pts';
+    el.textContent = '+' + pts;
+    el.style.left = (r.left + r.width / 2) + 'px';
+    el.style.top = (r.top + r.height / 2) + 'px';
+    $('float-layer').appendChild(el);
+    setTimeout(() => el.remove(), 1000 * motionScale() + 50);
+  }
+
+  let conflictTimer = null;
+  function showConflicts(idx, conflicts) {
+    clearConflicts();
+    cells[idx].classList.add('conflict-target');
+    conflicts.forEach((i) => cells[i].classList.add('conflict'));
+    conflictTimer = setTimeout(clearConflicts, 1100);
+  }
+  function clearConflicts() {
+    clearTimeout(conflictTimer);
+    cells.forEach((c) => c.classList.remove('conflict', 'conflict-target'));
+  }
+
+  function nudgeQueue() {
+    qslots.forEach((s) => {
+      if (!s.classList.contains('has-tile')) return;
+      s.classList.remove('nudge'); void s.offsetWidth; s.classList.add('nudge');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Input
+  // ---------------------------------------------------------------------------
+  function onQueueTap(i) {
+    if (app.busy || (app.tutorial && app.tutorial.waiting)) return;
+    SFX.unlock();
+    if (!app.game.queue[i] || app.game.over) return;
+    app.selected = app.selected === i ? null : i;
+    if (app.selected != null) SFX.select();
+    clearConflicts();
+    renderQueue();
+    renderHints();
+  }
+
+  async function onCellTap(idx) {
+    if (app.busy || (app.tutorial && app.tutorial.waiting)) return;
+    SFX.unlock();
+    const g = app.game;
+    if (g.over) { showEnd(); return; }
+
+    if (app.selected == null) {
+      if (g.board[idx] !== LSF.EMPTY) return;
+      const remaining = g.queue.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+      if (remaining.length === 1) {
+        app.selected = remaining[0]; // only one choice left: select it for the player
+      } else {
+        nudgeQueue();
+        toast('먼저 아래에서 타일을 고르세요');
+        return;
+      }
+    }
+
+    const step = app.tutorial && TUTORIAL[app.tutorial.i];
+    if (step && step.lock && step.target !== idx) {
+      toast('테두리가 숨 쉬는 칸에 놓아 보세요');
+      return;
+    }
+
+    const pre = g.board.slice();
+    const res = LSF.place(g, app.selected, idx);
+    if (!res.ok) {
+      g.invalidTaps = (g.invalidTaps || 0) + 1;
+      SFX.invalid();
+      if (res.reason === 'latin') {
+        showConflicts(idx, res.conflicts);
+        toast('같은 줄에 같은 기호가 있어요');
+      } else if (res.reason === 'occupied') {
+        toast('빈칸에만 놓을 수 있어요');
+      }
+      return;
+    }
+
+    tickActive(g);
+    app.selected = null;
+    clearConflicts();
+    await playMove(pre, res);
+    afterMove(res, pre);
+  }
+
+  /** Animate a resolved move, then render the final state. */
+  async function playMove(pre, res) {
+    app.busy = true;
+    cells.forEach((c) => c.classList.remove(...HINT_CLASSES));
+    const b = pre.slice();
+    b[res.idx] = res.kind;
+    renderBoard(b);
+    tileAt(res.idx).classList.add('pop');
+    SFX.place();
+    renderQueue(res.refilled ? [0, 0, 0] : app.game.queue);
+
+    const step = res.steps[0];
+    if (step) {
+      await wait(170);
+      step.groups.forEach((grp) => grp.cells.forEach((i) => { const t = tileAt(i); if (t) t.classList.add(grp.type === 'box' ? 'fusing' : 'lining'); }));
+      await wait(240);
+      step.cleared.forEach((i) => { const t = tileAt(i); if (t) t.classList.add('clearing'); });
+      if (step.type === 'clear') SFX.clear(); else if (step.type === 'crown') SFX.crown(); else SFX.fusion(1);
+      await wait(280);
+      step.cleared.forEach((i) => { b[i] = LSF.EMPTY; });
+      if (step.type === 'clear') {
+        renderBoard(b);
+      } else {
+        b[step.focus] = step.spawn;
+        renderBoard(b);
+        tileAt(step.focus).classList.add('spawn');
+      }
+      floatPoints(step.focus, step.points);
+      if (step.type === 'crown') {
+        await wait(520);
+        tileAt(step.focus).classList.add('crowning');
+        await wait(680);
+        b[step.focus] = LSF.EMPTY;
+        renderBoard(b);
+        bump('crowns');
+        toast('왕관 획득! 수 수정하기 +1', 2200);
+      } else {
+        await wait(260);
+      }
+      bump('score');
+    }
+
+    renderBoard(app.game.board);
+    renderQueue(null, res.refilled);
+    renderUpcoming();
+    renderHud();
+    renderHints();
+    if (res.levelsCleared) {
+      SFX.goal();
+      bump('goal-card');
+      toast('목표 달성! ' + app.game.level + '단계 · 새 목표: ' + goalText(app.game.goal), 2600);
+    }
+    app.busy = false;
+  }
+
+  // --- just-in-time tips: each shown once, right when the situation first happens ---
+  const TIPS = {
+    starLost: { title: '★가 사라졌어요', text: '줄이 가득 차면 그 줄은 지워지고, 줄 안의 {5}도 함께 사라져요. 타일을 고르면 {5}를 잃는 칸은 <b>호박색 점선</b>으로 표시돼요.' },
+    boxBlocked: { title: '막힌 구역이 생겼어요', text: '이 2×2 구역은 대각선에 같은 기호가 있어 가득 차도 자라지 않아요. 그 구역을 지나는 <b>줄을 지워서</b> 비워야 다시 쓸 수 있어요.' },
+    firstStar: { title: '첫 ★!', text: '{5}가 있는 구역을 나머지 서로 다른 기호 3개로 채우면 {9} 왕관이 돼요. 그 구역을 지나는 줄은 꽉 채우지 않게 조심하세요.' },
+    stuckTile: { title: '흐린 타일', text: '흐리게 보이는 타일은 지금 놓을 수 있는 칸이 없어요. 다른 타일부터 두면 자리가 생길 수 있어요. 대기열 3개를 다 써야 새 묶음이 와요.' },
+    lowMoves: { title: '남은 수가 얼마 없어요', text: '목표에 바로 닿는 칸을 찾아보세요. 막혔다면 <b>수 수정하기</b>로 한 수를 물려 다른 순서를 시도할 수 있어요.' }
+  };
+
+  /** Pick the most useful unseen tip for this move (at most one). */
+  function tipFor(pre, res) {
+    const g = app.game;
+    const st = res.steps[0];
+    const seen = (k) => app.tipsSeen[k];
+    if (!seen('starLost') && st && st.type === 'clear' && st.cleared.some((i) => pre[i] === LSF.STAR)) return 'starLost';
+    if (!seen('boxBlocked') && LSF.GROUPS.some((grp) => grp.type === 'box' &&
+        grp.cells.every((i) => g.board[i] !== LSF.EMPTY) && !LSF.isComplete(g.board, LSF.GROUPS.indexOf(grp)))) return 'boxBlocked';
+    if (!seen('firstStar') && st && st.type === 'star') return 'firstStar';
+    if (!seen('stuckTile') && g.queue.filter(Boolean).length > 1 &&
+        g.queue.some((k) => k && !LSF.legalCells(g.board, k).length)) return 'stuckTile';
+    if (!seen('lowMoves') && g.mode === 'stage' && LSF.movesLeft(g) <= 3) return 'lowMoves';
+    return null;
+  }
+
+  function showTip(key) {
+    app.tipsSeen[key] = true;
+    store.set('tips', app.tipsSeen);
+    const tip = TIPS[key];
+    openModal({ title: tip.title, body: '<p>' + withTiles(tip.text) + '</p>', buttons: [{ label: '알겠어요', primary: true }] });
+  }
+
+  function afterMove(res, pre) {
+    save();
+    if (app.tutorial) { tutorialCheck(res); return; }
+    if (!res.over) {
+      const tip = tipFor(pre, res);
+      if (tip) setTimeout(() => { if (!app.modalClose && !app.game.over) showTip(tip); }, 250 * motionScale());
+    }
+    if (res.over) {
+      recordResult();
+      logAttempt(res.result);
+      renderHud();
+      setTimeout(() => { if (res.result === 'won') SFX.crown(); else SFX.gameOver(); showEnd(); }, 350 * motionScale());
+    }
+  }
+
+  function doUndo() {
+    const g = app.game;
+    if (app.busy || !LSF.canUndo(g) || g.mode === 'tutorial' || g.result === 'won') return;
+    closeModal();
+    LSF.undo(g);
+    app.selected = null;
+    clearConflicts();
+    SFX.undo();
+    render();
+    save();
+    toast('한 수 되돌렸어요 · 남은 횟수 ' + g.undoLeft);
+  }
+
+  function onKey(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'Escape') {
+      if (app.modalClose) { app.modalClose(); return; }
+      app.selected = null; renderQueue(); renderHints(); return;
+    }
+    if (app.modalClose) return;
+    if (e.key >= '1' && e.key <= '3') { onQueueTap(Number(e.key) - 1); e.preventDefault(); return; }
+    if (e.key === 'u' || e.key === 'U') { doUndo(); return; }
+    const arrows = { ArrowUp: -4, ArrowDown: 4, ArrowLeft: -1, ArrowRight: 1 };
+    if (arrows[e.key] !== undefined) {
+      const cur = cells.indexOf(document.activeElement);
+      let next = cur < 0 ? 0 : cur + arrows[e.key];
+      if (cur >= 0 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && LSF.rowOf(next) !== LSF.rowOf(cur)) next = cur;
+      if (next >= 0 && next < LSF.CELLS) cells[next].focus();
+      e.preventDefault();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Games: stages / endless / daily, persistence, records
+  // ---------------------------------------------------------------------------
+  function save() {
+    const g = app.game;
+    if (!g || g.mode === 'tutorial') return;
+    if (g.mode === 'daily') store.set('game.daily', { key: g.dailyKey, state: g });
+    else if (g.mode === 'stage') store.set('game.stage', g);
+    else store.set('game.free', g);
+    store.set('lastMode', g.mode);
+  }
+
+  function setGame(g) {
+    if (!g.startedAt) g.startedAt = Date.now();
+    g.lastActAt = Date.now();
+    app.game = g;
+    app.selected = null;
+    clearConflicts();
+    render();
+    save();
+    if (g.over && g.mode !== 'tutorial') setTimeout(showEnd, 200);
+  }
+
+  function leaveCurrent() {
+    endTutorial();
+    closeModal();
+    if (app.game && app.game.mode !== 'tutorial') {
+      if (!app.game.over) logAttempt('quit');
+      recordResult();
+      save();
+    }
+  }
+
+  // --- stages ---
+  function stageUnlocked(n) { return n === 1 || (app.stageStars[n - 1] || 0) > 0; }
+  function nextOpenStage() {
+    for (const s of STAGES) if (!app.stageStars[s.stage]) return s.stage;
+    return STAGES.length;
+  }
+
+  /** @param {boolean} [retry] same stage again: skip the intro card */
+  function startStage(n, retry) {
+    const def = STAGES[n - 1];
+    if (!def) return;
+    leaveCurrent();
+    setGame(LSF.createGame({ mode: 'stage', seed: def.seed, goal: def.goal, limit: def.limit, stage: n }));
+    if (retry) { toast('다시 도전 · 같은 판이에요', 1800); return; }
+    showStageIntro(def);
+  }
+
+  function showStageIntro(def) {
+    const best = app.stageStars[def.stage] || 0;
+    const chips = LSF.GOAL_KEYS.filter((k) => def.goal[k]).map((k) =>
+      '<span class="goal-chip big">' + goalIcon(k) + '<b>' + def.goal[k] + '</b></span>').join('');
+    openModal({
+      title: '스테이지 ' + def.stage,
+      body: '<div class="intro-goal">' + chips + '</div>' +
+        '<p class="center"><b class="intro-limit">' + def.limit + '</b>수 안에 모으세요</p>' +
+        '<p class="center small">남은 수 ' + Math.ceil(def.limit * 0.3) + '수 이상 = 별 3개 · ' + Math.ceil(def.limit * 0.12) + '수 이상 = 별 2개' +
+        (best ? '<br>최고 기록 ' + '★'.repeat(best) + '☆'.repeat(3 - best) : '') + '</p>',
+      buttons: [{ label: '시작', primary: true }]
+    });
+  }
+
+  function resumeStage() {
+    const saved = LSF.deserialize(store.get('game.stage', null));
+    if (saved && saved.mode === 'stage' && STAGES[saved.stage - 1]) setGame(saved);
+    else startStage(nextOpenStage());
+  }
+
+  // --- endless (free) / daily ---
+  function newFreeGame() {
+    leaveCurrent();
+    setGame(LSF.createGame({ mode: 'free' }));
+  }
+
+  function resumeFree() {
+    const saved = LSF.deserialize(store.get('game.free', null));
+    if (saved && saved.mode === 'free') setGame(saved);
+    else setGame(LSF.createGame({ mode: 'free' }));
+  }
+
+  function startDaily() {
+    const key = LSF.dateKey();
+    const saved = store.get('game.daily', null);
+    let g = saved && saved.key === key ? LSF.deserialize(saved.state) : null;
+    if (!g) {
+      g = LSF.createGame({ seed: LSF.dailySeed(key), mode: 'daily' });
+      g.dailyKey = key;
+    }
+    setGame(g);
+  }
+
+  /** Update records for the current game (idempotent: safe to call repeatedly). */
+  function recordResult() {
+    const g = app.game;
+    if (!g || g.mode === 'tutorial' || g.moves === 0) return;
+    if (g.mode === 'stage') {
+      const stars = LSF.starRating(g);
+      if (stars > (app.stageStars[g.stage] || 0)) {
+        app.stageStars[g.stage] = stars;
+        store.set('stages', app.stageStars);
+      }
+      return;
+    }
+    const s = app.stats;
+    if (!g.recorded) { s.games++; g.recorded = true; g.crownsRecorded = 0; }
+    if (g.crowns > (g.crownsRecorded || 0)) { s.crowns += g.crowns - (g.crownsRecorded || 0); g.crownsRecorded = g.crowns; }
+    s.best = Math.max(s.best, g.score);
+    s.bestLevel = Math.max(s.bestLevel, g.level - 1); // levels fully cleared
+    store.set('stats', s);
+    if (g.mode === 'daily') {
+      app.daily[g.dailyKey] = { score: g.score, level: g.level, crowns: g.crowns, moves: g.moves, done: g.over };
+      store.set('daily', app.daily);
+    }
+  }
+
+  // --- playtest log: one entry per attempt, exported from the menu (docs/PLAYTEST.md) ---
+  const LOG_MAX = 500;
+
+  /** Add active play time since the last action (idle gaps count at most 60 s). */
+  function tickActive(g) {
+    const now = Date.now();
+    g.activeMs = (g.activeMs || 0) + Math.min(60000, now - (g.lastActAt || now));
+    g.lastActAt = now;
+  }
+
+  /** Record (or update) the current attempt. result: 'won' | 'lost' | 'over' | 'quit'. */
+  function logAttempt(result) {
+    const g = app.game;
+    if (!g || g.mode === 'tutorial' || g.moves === 0) return;
+    const entry = {
+      at: new Date(g.startedAt || Date.now()).toISOString(),
+      mode: g.mode,
+      stage: g.stage || undefined,
+      result,
+      moves: g.moves,
+      limit: g.mode === 'stage' ? g.limit : undefined,
+      level: g.endless ? g.level : undefined,
+      stars: g.mode === 'stage' ? LSF.starRating(g) : undefined,
+      made: Object.assign({}, g.made),
+      score: g.score,
+      undos: g.undosUsed,
+      invalid: g.invalidTaps || 0,
+      sec: Math.round((g.activeMs || 0) / 1000),
+      hints: app.settings.hints
+    };
+    const i = g.logIndex;
+    if (i != null && app.playlog[i] && app.playlog[i].at === entry.at && app.playlog[i].mode === entry.mode) {
+      app.playlog[i] = entry; // same attempt finished again after an undo
+    } else {
+      app.playlog.push(entry);
+      if (app.playlog.length > LOG_MAX) app.playlog.shift();
+      g.logIndex = app.playlog.length - 1;
+    }
+    store.set('playlog', app.playlog);
+  }
+
+  async function exportPlaylog() {
+    const data = {
+      app: 'sagak-sagak',
+      version: '0.1.0',
+      exportedAt: new Date().toISOString(),
+      device: { ua: navigator.userAgent, viewport: innerWidth + 'x' + innerHeight, dpr: window.devicePixelRatio || 1 },
+      settings: app.settings,
+      stageStars: app.stageStars,
+      stats: app.stats,
+      stageTable: STAGES.map((s) => ({ stage: s.stage, goal: s.goal, limit: s.limit, botClear: s.clearRate })),
+      attempts: app.playlog
+    };
+    const ok = await copyText(JSON.stringify(data));
+    toast(ok ? '테스트 기록 ' + app.playlog.length + '건을 복사했어요' : '복사하지 못했어요', 2400);
+  }
+
+  function confirmThen(title, text, label, fn) {
+    openModal({
+      title, body: '<p>' + text + '</p>', layout: 'row',
+      buttons: [{ label: '취소' }, { label, primary: true, onClick: fn }]
+    });
+  }
+
+  function onFooterNew() {
+    if (app.busy) return;
+    const g = app.game;
+    if (g.mode === 'stage') {
+      if (g.moves > 0 && !g.over) confirmThen('다시 하기', '이 스테이지를 처음부터 다시 할까요?', '다시 하기', () => startStage(g.stage, true));
+      else startStage(g.stage, true);
+    } else if (g.mode === 'daily') {
+      leaveCurrent(); resumeFree();
+    } else if (g.moves > 0 && !g.over) {
+      confirmThen('새 게임', '지금 도전을 끝내고 새로 시작할까요?', '새로 시작', newFreeGame);
+    } else {
+      newFreeGame();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clipboard
+  // ---------------------------------------------------------------------------
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  async function shareDaily() {
+    const g = app.game;
+    const ok = await copyText(LSF.shareText(g, g.dailyKey) + '\n도달 단계 ' + g.level);
+    toast(ok ? '결과를 복사했어요' : '복사하지 못했어요');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Modals
+  // ---------------------------------------------------------------------------
+  function closeModal() {
+    if (app.modalClose) app.modalClose();
+  }
+
+  /**
+   * @param {{title:string, body?:string|Node, buttons?:Array<{label:string, primary?:boolean,
+   *   disabled?:boolean, className?:string, onClick?:Function, keepOpen?:boolean}>,
+   *   layout?:'col'|'row', onClose?:Function, wide?:boolean}} o
+   */
+  function openModal(o) {
+    closeModal();
+    const root = $('modal-root');
+    const back = document.createElement('div');
+    back.className = 'modal-backdrop';
+    const box = document.createElement('div');
+    box.className = 'modal' + (o.wide ? ' wide' : '');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', o.title);
+    box.innerHTML = '<h2>' + o.title + '</h2>';
+    if (typeof o.body === 'string') box.insertAdjacentHTML('beforeend', o.body);
+    else if (o.body) box.appendChild(o.body);
+    const btns = document.createElement('div');
+    btns.className = o.layout === 'row' ? 'btn-row' : 'btn-col';
+    (o.buttons || []).forEach((bd) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (bd.primary ? ' primary' : '') + (bd.className ? ' ' + bd.className : '');
+      b.innerHTML = bd.label;
+      b.disabled = !!bd.disabled;
+      b.addEventListener('click', () => {
+        if (!bd.keepOpen) close();
+        if (bd.onClick) bd.onClick();
+      });
+      btns.appendChild(b);
+    });
+    if (btns.children.length) box.appendChild(btns);
+    back.appendChild(box);
+    root.appendChild(back);
+
+    // Keep keyboard and screen-reader focus inside the dialog while it is open.
+    const appEl = $('app');
+    appEl.inert = true;
+    appEl.setAttribute('aria-hidden', 'true');
+    box.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll('button:not([disabled])')];
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+      else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+    });
+
+    const prevFocus = document.activeElement;
+    function close() {
+      if (app.modalClose !== close) return;
+      app.modalClose = null;
+      back.remove();
+      appEl.inert = false;
+      appEl.removeAttribute('aria-hidden');
+      if (o.onClose) o.onClose();
+      if (prevFocus && prevFocus.focus && document.contains(prevFocus)) prevFocus.focus();
+    }
+    back.addEventListener('click', (e) => { if (e.target === back) close(); });
+    app.modalClose = close;
+    const first = box.querySelector('.btn.primary') || box.querySelector('button');
+    if (first) first.focus();
+    return close;
+  }
+
+  function resultGrid(items) {
+    return '<div class="result-grid">' + items.map(([k, v]) => '<div><span>' + k + '</span><b>' + v + '</b></div>').join('') + '</div>';
+  }
+
+  function goalSummary(g) {
+    const prog = LSF.goalProgress(g);
+    return LSF.GOAL_KEYS.filter((k) => g.goal[k]).map((k) =>
+      '<span class="goal-chip' + (prog[k] >= g.goal[k] ? ' done' : '') + '">' + goalIcon(k) + '<b>' + Math.min(prog[k], g.goal[k]) + '</b>/' + g.goal[k] + '</span>').join('');
+  }
+
+  function showEnd() {
+    const g = app.game;
+    if (!g.over || g.mode === 'tutorial') return;
+    if (g.mode === 'stage') { showStageResult(); return; }
+    const buttons = [];
+    if (LSF.canUndo(g)) buttons.push({ label: '수 수정하기 (' + g.undoLeft + '회 남음)', primary: true, onClick: doUndo });
+    if (g.mode === 'daily') {
+      buttons.push({ label: '결과 복사', onClick: shareDaily, keepOpen: true });
+      buttons.push({ label: '끝없는 도전 하기', onClick: () => { leaveCurrent(); resumeFree(); } });
+    } else {
+      buttons.push({ label: '새 도전', primary: !LSF.canUndo(g), onClick: newFreeGame });
+    }
+    const outOfMoves = LSF.movesLeft(g) === 0;
+    if (g.mode === 'daily') {
+      openModal({
+        title: '오늘의 퍼즐 완료',
+        body: '<p>' + g.level + '단계까지 왔어요. 내일 새 퍼즐이 열려요.' +
+          (LSF.canUndo(g) ? ' 아직 수 수정하기로 더 이어갈 수도 있어요.' : '') + '</p>' +
+          resultGrid([['도달 단계', g.level], ['점수', g.score], ['왕관', g.crowns], ['둔 수', g.moves]]),
+        buttons
+      });
+      return;
+    }
+    openModal({
+      title: outOfMoves ? '수를 다 썼어요' : '더 둘 곳이 없어요',
+      body: '<p>' + (outOfMoves ? g.level + '단계 목표를 채우지 못했어요.' : '대기열의 어떤 타일도 놓을 수 있는 칸이 없어요.') +
+        (LSF.canUndo(g) ? ' 한 수 물려 다시 계획해 볼 수 있어요.' : '') + '</p>' +
+        '<div class="goal-line">목표 ' + goalSummary(g) + '</div>' +
+        resultGrid([['도달 단계', g.level], ['점수', g.score], ['왕관', g.crowns], ['둔 수', g.moves]]),
+      buttons
+    });
+  }
+
+  function ratingHTML(n) {
+    return '<div class="rating" aria-label="별 ' + n + '개">' +
+      [1, 2, 3].map((i) => '<span class="' + (i <= n ? 'on' : '') + '">' + svg(5) + '</span>').join('') + '</div>';
+  }
+
+  function showStageResult() {
+    const g = app.game;
+    const n = g.stage;
+    const hasNext = !!STAGES[n];
+    if (g.result === 'won') {
+      const stars = LSF.starRating(g);
+      openModal({
+        title: '스테이지 ' + n + ' 완료!',
+        body: ratingHTML(stars) +
+          '<p class="center">남은 수 <b>' + LSF.movesLeft(g) + '</b> / ' + g.limit +
+          (stars < 3 ? ' · 수를 더 아끼면 별이 늘어요' : ' · 완벽해요!') + '</p>',
+        buttons: [
+          hasNext ? { label: '다음 스테이지', primary: true, onClick: () => startStage(n + 1) } : { label: '모든 스테이지 완료!', disabled: true },
+          { label: '다시 하기', onClick: () => startStage(n, true) },
+          { label: '스테이지 목록', onClick: showStageSelect }
+        ]
+      });
+      return;
+    }
+    const buttons = [];
+    if (LSF.canUndo(g)) buttons.push({ label: '수 수정하기 (' + g.undoLeft + '회 남음)', primary: true, onClick: doUndo });
+    buttons.push({ label: '처음부터 다시', primary: !LSF.canUndo(g), onClick: () => startStage(n, true) });
+    buttons.push({ label: '스테이지 목록', onClick: showStageSelect });
+    openModal({
+      title: '아쉬워요',
+      body: '<p>' + (LSF.movesLeft(g) === 0 ? '수를 다 썼어요.' : '더 둘 곳이 없어요.') +
+        ' 같은 판이 다시 나오니 순서를 바꿔 계획해 보세요.</p><div class="goal-line">목표 ' + goalSummary(g) + '</div>',
+      buttons
+    });
+  }
+
+  function showStageSelect() {
+    const grid = document.createElement('div');
+    grid.className = 'stage-grid';
+    STAGES.forEach((s) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'stage-btn';
+      const stars = app.stageStars[s.stage] || 0;
+      const open = stageUnlocked(s.stage);
+      b.disabled = !open;
+      if (app.game && app.game.mode === 'stage' && app.game.stage === s.stage) b.classList.add('current');
+      b.innerHTML = '<b>' + s.stage + '</b><span class="mini-stars">' + (open ? '★'.repeat(stars) + '☆'.repeat(3 - stars) : '잠김') + '</span>';
+      b.setAttribute('aria-label', '스테이지 ' + s.stage + (open ? ', 별 ' + stars + '개, 목표 ' + goalText(s.goal) : ', 잠김'));
+      b.addEventListener('click', () => { closeModal(); startStage(s.stage); });
+      grid.appendChild(b);
+    });
+    const total = Object.values(app.stageStars).reduce((a, b) => a + b, 0);
+    const body = document.createElement('div');
+    body.innerHTML = '<p>모은 별 ' + total + ' / ' + STAGES.length * 3 + ' · 같은 스테이지는 언제나 같은 판이에요.</p>';
+    body.appendChild(grid);
+    openModal({ title: '스테이지', body, wide: true, buttons: [{ label: '닫기' }] });
+  }
+
+  function showMenu() {
+    const key = LSF.dateKey();
+    const dailyDone = app.daily[key] && app.daily[key].done;
+    const items = [
+      { label: '스테이지', onClick: showStageSelect },
+      { label: '끝없는 도전 (새 게임)', onClick: newFreeGame },
+      { label: '끝없는 도전 이어하기', onClick: () => { leaveCurrent(); resumeFree(); } },
+      { label: '오늘의 퍼즐 · ' + key + (dailyDone ? ' (완료)' : ''), onClick: () => { leaveCurrent(); startDaily(); } },
+      { label: '규칙 보기', onClick: showRules },
+      { label: '기록', onClick: showStats },
+      { label: '설정', onClick: showSettings },
+      { label: '튜토리얼 다시 하기', onClick: startTutorial },
+      { label: '테스트 기록 복사 (' + app.playlog.length + '건)', onClick: exportPlaylog },
+      { label: '닫기' }
+    ].map((it) => Object.assign({ className: 'menu-item' }, it));
+    const version = '0.1.0'; // stamped by scripts/build.mjs
+    openModal({ title: '메뉴', body: '<p class="small">사각사각 ' + (version.indexOf('_') === 0 ? '개발판' : 'v' + version) + '</p>', buttons: items });
+  }
+
+  function showRules() {
+    openModal({
+      title: '규칙',
+      body: withTiles('<ol class="rules">' +
+        '<li>아래 <b>대기열</b>의 타일을 탭해 고르고, 보드의 빈칸을 탭해 놓아요. 3개를 모두 쓰면 새 묶음이 와요.</li>' +
+        '<li>같은 <b>가로줄·세로줄</b>에는 같은 기호를 둘 수 없어요. (2×2 구역 안의 대각선은 괜찮아요.)</li>' +
+        '<li><b>2×2 구역</b>에 서로 다른 {1}{2}{3}{4}가 모이면 놓은 자리에 {5}가 자라고, 나머지 3칸은 비워져요.</li>' +
+        '<li>{5}가 있는 구역을 나머지 서로 다른 기호 3개로 채우면 {9} <b>왕관</b>! ({5}는 빠진 기호 하나를 대신해요.)</li>' +
+        '<li>가로·세로 <b>줄</b>이 가득 차면 그 줄은 <b>지워지기만</b> 해요 {L}. 줄 안의 {5}도 함께 사라지니 조심!</li>' +
+        '<li>화면 위 <b>목표</b>를 <b>남은 수</b> 안에 채우세요. 스테이지는 수를 아낄수록 별이 늘고, 끝없는 도전은 남은 수가 다음 목표로 이월돼요.</li>' +
+        '<li><b>수 수정하기</b>로 한 수를 물릴 수 있어요(3회, 왕관마다 +1). 되돌려도 나올 타일은 바뀌지 않아요.</li>' +
+        '<li>타일을 고르면 놓을 수 있는 칸에 점이, 결과가 생기는 칸에 테두리가 보여요: 금색 = {5}, 진한 금색 = {9}, 회색 점선 = 줄 지우기, 호박색 = {5}가 사라지는 줄.</li>' +
+        '</ol>'),
+      buttons: [{ label: '닫기', primary: true }]
+    });
+  }
+
+  function showStats() {
+    const s = app.stats;
+    const key = LSF.dateKey();
+    const d = app.daily[key];
+    const stars = Object.values(app.stageStars).reduce((a, b) => a + b, 0);
+    const cleared = Object.keys(app.stageStars).length;
+    openModal({
+      title: '기록',
+      body: resultGrid([
+        ['스테이지 완료', cleared + ' / ' + STAGES.length], ['모은 별', stars],
+        ['끝없는 도전 최고 단계', s.bestLevel], ['최고 점수', s.best],
+        ['도전한 판', s.games], ['모은 왕관', s.crowns]
+      ]) + '<p>오늘의 퍼즐 (' + key + '): ' + (d ? d.level + '단계 · ' + d.score + '점' + (d.done ? '' : ' · 진행 중') : '아직 도전하지 않았어요') + '</p>',
+      buttons: [{ label: '닫기', primary: true }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Settings
+  // ---------------------------------------------------------------------------
+  function saveSettings() { store.set('settings', app.settings); applySettings(); }
+
+  function applySettings() {
+    const s = app.settings;
+    const html = document.documentElement;
+    const dark = s.theme === 'dark' || (s.theme === 'auto' && mqDark && mqDark.matches);
+    html.dataset.theme = dark ? 'dark' : 'light';
+    html.dataset.text = String(s.text);
+    html.dataset.motion = motionScale() < 1 ? 'reduce' : 'full';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#24211D' : '#FBF8F3');
+    SFX.setSound(s.sound);
+    SFX.setHaptics(s.haptics);
+    document.querySelectorAll('#btn-mode .seg').forEach((el) => el.classList.toggle('on', el.dataset.mode === s.display));
+    $('btn-mode').setAttribute('aria-label', '표시 방식: ' + (s.display === 'numbers' ? '숫자' : '도형') + '. 탭하여 전환');
+    $('crown-icon').innerHTML = svg(LSF.CROWN);
+    if (app.game) {
+      renderBoard(app.game.board, true);
+      renderQueue();
+      renderUpcoming();
+      renderHud();
+      renderHints();
+      renderCoach();
+    }
+  }
+
+  function segRow(label, key, options) {
+    const row = document.createElement('div');
+    row.className = 'setting';
+    row.innerHTML = '<span>' + label + '</span>';
+    const grp = document.createElement('div');
+    grp.className = 'seg-group';
+    grp.setAttribute('role', 'group');
+    grp.setAttribute('aria-label', label);
+    options.forEach(([val, text]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = text;
+      b.setAttribute('aria-pressed', String(app.settings[key] === val));
+      b.addEventListener('click', () => {
+        app.settings[key] = val;
+        grp.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        saveSettings();
+      });
+      grp.appendChild(b);
+    });
+    row.appendChild(grp);
+    return row;
+  }
+
+  function switchRow(label, key) {
+    const row = document.createElement('div');
+    row.className = 'setting';
+    row.innerHTML = '<span>' + label + '</span>';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'switch';
+    b.setAttribute('role', 'switch');
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-checked', String(!!app.settings[key]));
+    b.addEventListener('click', () => {
+      app.settings[key] = !app.settings[key];
+      b.setAttribute('aria-checked', String(app.settings[key]));
+      saveSettings();
+      if (key === 'sound' && app.settings.sound) { SFX.unlock(); SFX.select(); }
+    });
+    row.appendChild(b);
+    return row;
+  }
+
+  function showSettings() {
+    const body = document.createElement('div');
+    body.appendChild(segRow('표시', 'display', [['numbers', '숫자'], ['symbols', '도형']]));
+    body.appendChild(segRow('테마', 'theme', [['light', '낮'], ['dark', '밤'], ['auto', '자동']]));
+    body.appendChild(segRow('글자 크기', 'text', [[1, '보통'], [2, '크게'], [3, '아주 크게']]));
+    body.appendChild(segRow('움직임', 'motion', [['auto', '자동'], ['reduce', '줄이기']]));
+    body.appendChild(switchRow('소리', 'sound'));
+    body.appendChild(switchRow('진동', 'haptics'));
+    body.appendChild(segRow('칸 표시', 'hints', [['full', '결과까지'], ['legal', '놓을 곳만'], ['off', '끄기']]));
+    body.appendChild(switchRow('다음 묶음 미리보기', 'preview'));
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'link-btn';
+    reset.textContent = '기록 초기화';
+    reset.addEventListener('click', () => confirmThen('기록 초기화', '스테이지 별, 점수 기록을 모두 지울까요? 진행 중인 게임은 유지돼요.', '지우기', () => {
+      app.stats = Object.assign({}, DEFAULT_STATS);
+      app.daily = {};
+      app.stageStars = {};
+      store.set('stats', app.stats);
+      store.set('daily', app.daily);
+      store.set('stages', app.stageStars);
+      renderHud();
+      toast('기록을 지웠어요');
+    }));
+    body.appendChild(reset);
+    const tipsAgain = document.createElement('button');
+    tipsAgain.type = 'button';
+    tipsAgain.className = 'link-btn';
+    tipsAgain.textContent = '팁 다시 보기';
+    tipsAgain.addEventListener('click', () => {
+      app.tipsSeen = {};
+      store.set('tips', app.tipsSeen);
+      toast('상황별 팁이 다시 나와요');
+    });
+    body.appendChild(tipsAgain);
+    const clearLog = document.createElement('button');
+    clearLog.type = 'button';
+    clearLog.className = 'link-btn';
+    clearLog.textContent = '테스트 기록 지우기 (' + app.playlog.length + '건)';
+    clearLog.addEventListener('click', () => confirmThen('테스트 기록 지우기', '메뉴에서 복사하는 플레이테스트 기록 ' + app.playlog.length + '건을 지울까요? 보내기 전이라면 먼저 복사하세요.', '지우기', () => {
+      app.playlog = [];
+      store.set('playlog', app.playlog);
+      toast('테스트 기록을 지웠어요');
+    }));
+    body.appendChild(clearLog);
+    openModal({ title: '설정', body, buttons: [{ label: '닫기', primary: true }] });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tutorial (interactive, prepared boards — GDD §13)
+  // ---------------------------------------------------------------------------
+  const B = (...rows) => rows.join('').split('').map((ch) => (ch === '.' ? 0 : ch === '*' ? LSF.STAR : Number(ch)));
+
+  const TUTORIAL = [
+    {
+      text: '아래 {4} 타일을 탭해 고른 뒤, 테두리가 숨 쉬는 빈칸을 탭하세요. <b>2×2 구역</b>(옅은 칸 묶음)에 서로 다른 4개가 모이면 놓은 자리에 {5}가 자라요.',
+      board: B('12..', '3...', '....', '....'), queue: [4, 0, 0], target: 5, lock: true,
+      expect: (r) => r.steps.length && r.steps[0].type === 'star',
+      success: '{5}가 자랐어요! 구역의 나머지 3칸은 비워졌어요.'
+    },
+    {
+      text: '같은 <b>가로줄·세로줄</b>에는 같은 기호를 둘 수 없어요. {2}를 놓을 수 있는 칸은 딱 하나예요. 찾아보세요.',
+      board: B('.2..', '2...', '...2', '....'), queue: [2, 0, 0], target: null, hints: false,
+      expect: () => true,
+      success: '정답! 둘 수 없는 칸을 탭하면 부딪히는 타일이 호박색으로 표시돼요.'
+    },
+    {
+      text: '{5}가 있는 구역을 나머지 서로 다른 기호로 채우면 {9} <b>왕관</b>으로 자라요. {5}는 빠진 기호 하나를 대신해요.',
+      board: B('*2..', '3...', '....', '....'), queue: [4, 0, 0], target: 5, lock: true,
+      expect: (r) => r.crownsGained > 0,
+      success: '왕관! 왕관마다 수 수정하기가 1회 충전돼요.'
+    },
+    {
+      text: '가로·세로 <b>줄</b>이 가득 차면 그 줄은 <b>지워지기만</b> 해요. 줄 안의 {5}도 함께 사라져요. 한번 지워 볼까요?',
+      board: B('1*.3', '....', '....', '....'), queue: [2, 0, 0], target: 2, lock: true,
+      expect: (r) => r.steps.length && r.steps[0].type === 'clear',
+      success: '줄은 판을 비우는 데 쓰지만, 아끼던 {5}를 잃을 수도 있어요. 타일을 고르면 이런 칸은 호박색 테두리로 알려 줘요.'
+    },
+    {
+      final: true,
+      text: '화면 위 <b>목표</b>를 <b>남은 수</b> 안에 채우는 게임이에요. 스테이지는 같은 판이 다시 나오니 계획을 다듬어 보세요. 수를 아낄수록 별이 늘어요!'
+    }
+  ];
+
+  function startTutorial() {
+    closeModal();
+    if (app.game && app.game.mode !== 'tutorial') save();
+    app.tutorial = { i: 0, waiting: false, success: false };
+    loadTutorialStep();
+  }
+
+  function loadTutorialStep() {
+    const step = TUTORIAL[app.tutorial.i];
+    app.tutorial.waiting = !!step.final;
+    app.tutorial.success = false;
+    // empty upcoming bundle: the lesson ends with an empty tray instead of a refill
+    app.game = LSF.createGame({
+      mode: 'tutorial', seed: 'tutorial', endless: false, undoLeft: 0,
+      board: step.final ? new Array(16).fill(0) : step.board,
+      queue: step.final ? [1, 2, 3] : step.queue,
+      upcoming: step.final ? [4, 1, 2] : [0, 0, 0]
+    });
+    app.selected = null;
+    render();
+    renderCoach();
+  }
+
+  function renderCoach() {
+    const el = $('coach');
+    if (!app.tutorial) { el.hidden = true; el.innerHTML = ''; return; }
+    const t = app.tutorial;
+    const step = TUTORIAL[t.i];
+    let html = '<div class="coach-head"><span>튜토리얼 ' + (t.i + 1) + ' / ' + TUTORIAL.length + '</span>' +
+      (step.final ? '' : '<button type="button" class="link-btn" data-act="skip">건너뛰기</button>') + '</div>';
+    html += '<div>' + withTiles(t.success ? '<span class="ok">' + step.success + '</span>' : step.text) + '</div>';
+    if (t.success) html += '<div class="coach-foot"><button type="button" class="btn primary" data-act="next">다음</button></div>';
+    if (step.final) html += '<div class="coach-foot"><button type="button" class="btn primary" data-act="finish">스테이지 1 시작</button></div>';
+    el.innerHTML = html;
+    el.hidden = false;
+    el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'next') { app.tutorial.i++; loadTutorialStep(); }
+      else finishTutorial();
+    }));
+    const focusBtn = el.querySelector('.btn.primary');
+    if (focusBtn) focusBtn.focus();
+  }
+
+  function tutorialCheck(res) {
+    const step = TUTORIAL[app.tutorial.i];
+    app.tutorial.waiting = true;
+    if (step.expect(res)) {
+      app.tutorial.success = true;
+      renderHints();
+      renderCoach();
+    } else {
+      toast('다시 해볼까요?');
+      setTimeout(loadTutorialStep, 900);
+    }
+  }
+
+  function endTutorial() {
+    if (!app.tutorial) return;
+    app.tutorial = null;
+    store.set('tutorialDone', true);
+    renderCoach();
+  }
+
+  function finishTutorial() {
+    endTutorial();
+    if (!app.stageStars[1]) startStage(1); else resumeLast();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------------
+  function toggleDisplay() {
+    SFX.unlock();
+    app.settings.display = app.settings.display === 'numbers' ? 'symbols' : 'numbers';
+    saveSettings();
+  }
+
+  /** Size the board to the space actually left between HUD and tray (coach card included). */
+  function fitBoard() {
+    const area = document.querySelector('.board-area');
+    const coach = $('coach');
+    const coachH = coach.hidden ? 0 : coach.offsetHeight + 10;
+    // the toast overlays the area's bottom padding, so it needs no room of its own
+    const avail = Math.min(area.clientWidth - 8, area.clientHeight - coachH - 12); // room for quadrant borders
+    const size = Math.max(200, Math.min(560, Math.floor(avail)));
+    document.documentElement.style.setProperty('--board', size + 'px');
+  }
+
+  function resumeLast() {
+    const last = store.get('lastMode', 'stage');
+    if (last === 'daily' && (store.get('game.daily', {}) || {}).key === LSF.dateKey()) startDaily();
+    else if (last === 'free') resumeFree();
+    else resumeStage();
+  }
+
+  function boot() {
+    buildBoard();
+    buildQueue();
+    document.querySelector('#btn-mode [data-mode="symbols"]').innerHTML = [1, 2, 3, 4].map(svg).join('');
+    applySettings();
+
+    $('btn-menu').addEventListener('click', () => { SFX.unlock(); showMenu(); });
+    $('btn-mode').addEventListener('click', toggleDisplay);
+    $('btn-undo').addEventListener('click', doUndo);
+    $('btn-new').addEventListener('click', onFooterNew);
+    $('goal-card').addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="stages"]') && app.game && app.game.mode === 'stage' && !app.busy) showStageSelect();
+    });
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('dblclick', (e) => e.preventDefault());
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+    window.addEventListener('pagehide', save);
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => fitBoard()).observe(document.querySelector('.board-area'));
+      new ResizeObserver(() => fitBoard()).observe($('coach'));
+    } else {
+      window.addEventListener('resize', fitBoard);
+    }
+    const onPref = () => applySettings();
+    if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', onPref);
+    if (mqMotion && mqMotion.addEventListener) mqMotion.addEventListener('change', onPref);
+
+    if (!store.get('tutorialDone', false)) startTutorial();
+    else resumeLast();
+  }
+
+  // Test/debug hook (no effect on play).
+  window.LSFApp = { app, render, startTutorial, startStage, newFreeGame, startDaily };
+
+  boot();
+})();
+</script>
+</body>
+</html>
